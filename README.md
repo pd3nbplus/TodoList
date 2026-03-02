@@ -5,7 +5,24 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
 
 ![alt text](./img/项目截图.png)
 
+![alt text](./img/项目截图02.png)
+
 ## 版本说明 Version Notes
+
+### V1.0.1 (2026-03-02)
+
+- 新增左侧导航栏与页面路由：首页（任务工作台）+ 任务时序图页面。  
+  Added left sidebar navigation and routing: Home (workspace) + Timeline page.
+- 时序图升级为路线图视角：时间横轴、父子任务连线、截止线、当前时间定位（默认位于可视区域约 1/3 处）。  
+  Upgraded timeline to roadmap view with horizontal time axis, parent-child links, due lines, and “now” positioning (around one-third of viewport by default).
+- 时序图支持未完成子任务横向拖拽设置预计完成时间，并优化为更丝滑的拖拽预览。  
+  Timeline now supports horizontal dragging for unfinished subtasks to set planned completion time, with smoother drag preview behavior.
+- 首页子任务支持创建时设置预计完成时间，并可对已存在子任务进行“修改时间/保存”编辑。  
+  Home page supports planned completion time on subtask creation and allows editing existing subtask planned time via “Modify Time / Save”.
+- 主任务完成逻辑修复：支持确认弹窗后整任务（含子任务）联动完成/恢复。  
+  Fixed parent completion flow: after confirmation modal, parent and all subtasks now complete/revert together.
+- 视觉与交互优化：导航固定、时间线虚线分层、主题与样式统一为 `#9b59b6` 体系。  
+  Visual and interaction enhancements: fixed sidebar, layered dashed timeline styling, and unified `#9b59b6` theme system.
 
 ### v1.0.0 (2026-03-02)
 
@@ -50,6 +67,11 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
 
 ```text
 src/
+  pages/
+    HomePage.vue
+    TodoTimelinePage.vue
+  router/
+    index.ts
   components/todo/
     TodoWorkspace.vue
     TodoHeader.vue
@@ -63,6 +85,7 @@ src/
     useTodoList.ts
   types/
     todo.ts
+  App.vue
 ```
 
 ## 安装与运行 Setup

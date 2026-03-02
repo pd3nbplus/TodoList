@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { Modal } from 'ant-design-vue'
 import type { Project, Task, TaskFormInput, TaskPriority } from '../../types/todo'
 
@@ -19,7 +20,8 @@ const emit = defineEmits<{
   toggleTaskCompleted: [payload: { taskId: string; completed: boolean }]
   deleteTask: [taskId: string]
   updateTask: [payload: { taskId: string; input: TaskFormInput }]
-  addSubtask: [payload: { taskId: string; text: string }]
+  addSubtask: [payload: { taskId: string; text: string; plannedAt: string }]
+  updateSubtaskPlannedAt: [payload: { taskId: string; subtaskId: string; plannedAt: string }]
   toggleSubtaskCompleted: [payload: { taskId: string; subtaskId: string }]
   deleteSubtask: [payload: { taskId: string; subtaskId: string }]
   reorderTasks: [payload: { draggedTaskId: string; targetTaskId: string }]
@@ -29,6 +31,9 @@ const editingTaskId = ref<string | null>(null)
 const dragTaskId = ref<string | null>(null)
 const dragOverTaskId = ref<string | null>(null)
 const subtaskDrafts = reactive<Record<string, string>>({})
+const subtaskPlanDrafts = reactive<Record<string, string>>({})
+const editingSubtaskPlanKey = ref<string | null>(null)
+const subtaskPlanEditorRefs = reactive<Record<string, HTMLElement | null>>({})
 
 const editForm = reactive<TaskFormInput>({
   title: '',
@@ -128,8 +133,86 @@ function handleAddSubtask(taskId: string) {
     return
   }
 
-  emit('addSubtask', { taskId, text })
+  emit('addSubtask', {
+    taskId,
+    text,
+    plannedAt: subtaskPlanDrafts[taskId] || '',
+  })
   subtaskDrafts[taskId] = ''
+  subtaskPlanDrafts[taskId] = ''
+}
+
+function subtaskPlanKey(taskId: string, subtaskId: string): string {
+  return `${taskId}:${subtaskId}`
+}
+
+function getSubtaskPlanDraft(taskId: string, subtaskId: string, plannedAt: string | null): string {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  if (subtaskPlanDrafts[key] === undefined) {
+    subtaskPlanDrafts[key] = props.toLocalDateTimeInputValue(plannedAt)
+  }
+
+  return subtaskPlanDrafts[key] ?? ''
+}
+
+function setSubtaskPlanDraft(taskId: string, subtaskId: string, value: string) {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  subtaskPlanDrafts[key] = value
+}
+
+function handleSubtaskPlanDraftChange(taskId: string, subtaskId: string, value: string) {
+  setSubtaskPlanDraft(taskId, subtaskId, value)
+}
+
+function handleUpdateSubtaskPlannedAt(taskId: string, subtaskId: string) {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  emit('updateSubtaskPlannedAt', {
+    taskId,
+    subtaskId,
+    plannedAt: subtaskPlanDrafts[key] || '',
+  })
+  editingSubtaskPlanKey.value = null
+  delete subtaskPlanDrafts[key]
+}
+
+function beginEditSubtaskPlannedAt(taskId: string, subtaskId: string, plannedAt: string | null) {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  subtaskPlanDrafts[key] = props.toLocalDateTimeInputValue(plannedAt)
+  editingSubtaskPlanKey.value = key
+}
+
+function cancelEditSubtaskPlannedAt() {
+  const key = editingSubtaskPlanKey.value
+  if (!key) {
+    return
+  }
+
+  delete subtaskPlanDrafts[key]
+  editingSubtaskPlanKey.value = null
+}
+
+function setSubtaskPlanEditorRef(key: string, el: Element | ComponentPublicInstance | null) {
+  if (el && '$el' in el) {
+    subtaskPlanEditorRefs[key] = (el.$el as HTMLElement | null) ?? null
+    return
+  }
+
+  subtaskPlanEditorRefs[key] = (el as HTMLElement | null) ?? null
+}
+
+function handlePagePointerDown(event: MouseEvent) {
+  const key = editingSubtaskPlanKey.value
+  if (!key) {
+    return
+  }
+
+  const editor = subtaskPlanEditorRefs[key]
+  const target = event.target as Node | null
+  if (editor && target && editor.contains(target)) {
+    return
+  }
+
+  cancelEditSubtaskPlannedAt()
 }
 
 function resetDragState() {
@@ -165,6 +248,32 @@ function dueTagColor(task: Task): string {
   if (status === 'week') return 'cyan'
   return 'default'
 }
+
+function formatPlannedDate(iso: string | null): string {
+  if (!iso) {
+    return '无预计完成时间'
+  }
+
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return '无预计完成时间'
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handlePagePointerDown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', handlePagePointerDown)
+})
 </script>
 
 <template>
@@ -262,13 +371,46 @@ function dueTagColor(task: Task): string {
 
             <div v-if="task.subtasks.length > 0" class="subtask-list">
               <div v-for="subtask in task.subtasks" :key="subtask.id" class="subtask-item">
-                <label>
-                  <a-checkbox
-                    :checked="subtask.completed"
-                    @change="emit('toggleSubtaskCompleted', { taskId: task.id, subtaskId: subtask.id })"
-                  />
-                  <span :class="{ checked: subtask.completed }">{{ subtask.text }}</span>
-                </label>
+                <div class="subtask-main">
+                  <label>
+                    <a-checkbox
+                      :checked="subtask.completed"
+                      @change="emit('toggleSubtaskCompleted', { taskId: task.id, subtaskId: subtask.id })"
+                    />
+                    <span :class="{ checked: subtask.completed }">
+                      {{ subtask.text }}
+                    </span>
+                  </label>
+                  <div class="subtask-plan-row">
+                    <small class="planned-time">预计：{{ formatPlannedDate(subtask.plannedAt) }}</small>
+
+                    <div
+                      v-if="editingSubtaskPlanKey === subtaskPlanKey(task.id, subtask.id)"
+                      class="subtask-plan-editor"
+                      :ref="(el) => setSubtaskPlanEditorRef(subtaskPlanKey(task.id, subtask.id), el)"
+                    >
+                      <a-input
+                        :value="getSubtaskPlanDraft(task.id, subtask.id, subtask.plannedAt)"
+                        type="datetime-local"
+                        size="small"
+                        placeholder="设置预计完成时间"
+                        @update:value="handleSubtaskPlanDraftChange(task.id, subtask.id, $event)"
+                        @press-enter="handleUpdateSubtaskPlannedAt(task.id, subtask.id)"
+                      />
+                      <a-button size="small" type="primary" @click="handleUpdateSubtaskPlannedAt(task.id, subtask.id)">
+                        保存
+                      </a-button>
+                    </div>
+                    <a-button
+                      v-else
+                      size="small"
+                      type="link"
+                      @click="beginEditSubtaskPlannedAt(task.id, subtask.id, subtask.plannedAt)"
+                    >
+                      修改时间
+                    </a-button>
+                  </div>
+                </div>
                 <a-button
                   type="link"
                   danger
@@ -284,6 +426,11 @@ function dueTagColor(task: Task): string {
                 v-model:value="subtaskDrafts[task.id]"
                 placeholder="新增子任务并回车"
                 @press-enter="handleAddSubtask(task.id)"
+              />
+              <a-input
+                v-model:value="subtaskPlanDrafts[task.id]"
+                type="datetime-local"
+                placeholder="预计完成时间（可选）"
               />
               <a-button @click="handleAddSubtask(task.id)">添加</a-button>
             </div>
@@ -403,7 +550,7 @@ h2 {
 .subtask-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
@@ -413,14 +560,37 @@ h2 {
   gap: 8px;
 }
 
+.subtask-main {
+  display: grid;
+  gap: 4px;
+}
+
+.subtask-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .checked {
   text-decoration: line-through;
   color: #9985a8;
 }
 
+.planned-time {
+  color: #7a6c86;
+}
+
+.subtask-plan-editor {
+  display: inline-grid;
+  grid-template-columns: minmax(210px, 240px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .subtask-create {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 220px auto;
   gap: 8px;
 }
 
@@ -439,6 +609,10 @@ h2 {
 
   .edit-grid,
   .subtask-create {
+    grid-template-columns: 1fr;
+  }
+
+  .subtask-plan-editor {
     grid-template-columns: 1fr;
   }
 }

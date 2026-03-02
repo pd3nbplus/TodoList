@@ -3,6 +3,7 @@ import { beforeAll, describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import Antd from 'ant-design-vue'
 import App from '../App.vue'
+import router from '../router'
 
 beforeAll(() => {
   Object.defineProperty(window, 'matchMedia', {
@@ -21,10 +22,13 @@ beforeAll(() => {
 })
 
 describe('App', () => {
-  it('renders dashboard sections', () => {
+  it('renders dashboard sections', async () => {
+    await router.push('/')
+    await router.isReady()
+
     const wrapper = mount(App, {
       global: {
-        plugins: [Antd],
+        plugins: [Antd, router],
       },
     })
 

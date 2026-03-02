@@ -32,6 +32,7 @@ const {
   clearSelectedTasks,
   addSubtask,
   toggleSubtaskCompleted,
+  setSubtaskPlannedAt,
   deleteSubtask,
   reorderTasks,
   dueStatus,
@@ -40,19 +41,10 @@ const {
   formatDueDate,
   requestNotificationAccess,
   toLocalDateTimeInputValue,
+  toIsoDate,
 } = useTodoList()
 
 const selectedCount = computed(() => selectedTaskIds.value.length)
-
-const themeConfig = {
-  token: {
-    colorPrimary: '#9b59b6',
-    colorInfo: '#9b59b6',
-    colorLink: '#8e44ad',
-    borderRadius: 12,
-    fontSize: 14,
-  },
-}
 
 function handleCreateTask(payload: TaskFormInput) {
   const added = addTask(payload)
@@ -68,10 +60,17 @@ function handleUpdateTask(payload: { taskId: string; input: TaskFormInput }) {
   }
 }
 
-function handleAddSubtask(payload: { taskId: string; text: string }) {
-  const added = addSubtask(payload.taskId, payload.text)
+function handleAddSubtask(payload: { taskId: string; text: string; plannedAt: string }) {
+  const added = addSubtask(payload.taskId, payload.text, payload.plannedAt)
   if (!added) {
     message.warning('子任务内容不能为空')
+  }
+}
+
+function handleUpdateSubtaskPlannedAt(payload: { taskId: string; subtaskId: string; plannedAt: string }) {
+  const saved = setSubtaskPlannedAt(payload.taskId, payload.subtaskId, toIsoDate(payload.plannedAt))
+  if (saved) {
+    message.success('已更新子任务预计完成时间')
   }
 }
 
@@ -92,67 +91,66 @@ function selectAllVisible() {
 </script>
 
 <template>
-  <a-config-provider :theme="themeConfig">
-    <div class="todo-page">
-      <div class="glow glow-left"></div>
-      <div class="glow glow-right"></div>
+  <div class="todo-page">
+    <div class="glow glow-left"></div>
+    <div class="glow glow-right"></div>
 
-      <div class="workspace">
-        <TodoHeader :stats="stats" />
+    <div class="workspace">
+      <TodoHeader :stats="stats" />
 
-        <div class="content-grid">
-          <ProjectSidebar
+      <div class="content-grid">
+        <ProjectSidebar
+          :projects="projects"
+          :selected-project-id="filters.projectId"
+          :default-project-id="defaultProjectId"
+          :notification-permission="notificationPermission"
+          @add-project="handleAddProject"
+          @select-project="(projectId) => (filters.projectId = projectId)"
+          @remove-project="removeProject"
+          @request-notification="requestNotificationAccess"
+        />
+
+        <div class="main-stack">
+          <TaskComposer
             :projects="projects"
-            :selected-project-id="filters.projectId"
             :default-project-id="defaultProjectId"
-            :notification-permission="notificationPermission"
-            @add-project="handleAddProject"
-            @select-project="(projectId) => (filters.projectId = projectId)"
-            @remove-project="removeProject"
-            @request-notification="requestNotificationAccess"
+            @create-task="handleCreateTask"
           />
 
-          <div class="main-stack">
-            <TaskComposer
-              :projects="projects"
-              :default-project-id="defaultProjectId"
-              @create-task="handleCreateTask"
-            />
+          <TaskToolbar :filters="filters" @update-filters="handleUpdateFilters" />
 
-            <TaskToolbar :filters="filters" @update-filters="handleUpdateFilters" />
+          <TaskBulkActions
+            :selected-count="selectedCount"
+            @delete-selected="deleteSelectedTasks"
+            @clear-selected="clearSelectedTasks"
+            @select-all-visible="selectAllVisible"
+          />
 
-            <TaskBulkActions
-              :selected-count="selectedCount"
-              @delete-selected="deleteSelectedTasks"
-              @clear-selected="clearSelectedTasks"
-              @select-all-visible="selectAllVisible"
-            />
-
-            <TaskList
-              :tasks="visibleTasks"
-              :projects="projects"
-              :selected-task-ids="selectedTaskIds"
-              :project-name-by-id="projectNameById"
-              :format-due-date="formatDueDate"
-              :due-status="dueStatus"
-              :due-hint="dueHint"
-              :to-local-date-time-input-value="toLocalDateTimeInputValue"
-              @toggle-task-selected="toggleTaskSelected"
-              @toggle-task-completed="({ taskId, completed }) => setTaskCompleted(taskId, completed)"
-              @delete-task="deleteTask"
-              @update-task="handleUpdateTask"
-              @add-subtask="handleAddSubtask"
-              @toggle-subtask-completed="({ taskId, subtaskId }) => toggleSubtaskCompleted(taskId, subtaskId)"
-              @delete-subtask="({ taskId, subtaskId }) => deleteSubtask(taskId, subtaskId)"
-              @reorder-tasks="({ draggedTaskId, targetTaskId }) => reorderTasks(draggedTaskId, targetTaskId)"
-            />
-          </div>
+          <TaskList
+            :tasks="visibleTasks"
+            :projects="projects"
+            :selected-task-ids="selectedTaskIds"
+            :project-name-by-id="projectNameById"
+            :format-due-date="formatDueDate"
+            :due-status="dueStatus"
+            :due-hint="dueHint"
+            :to-local-date-time-input-value="toLocalDateTimeInputValue"
+            @toggle-task-selected="toggleTaskSelected"
+            @toggle-task-completed="({ taskId, completed }) => setTaskCompleted(taskId, completed)"
+            @delete-task="deleteTask"
+            @update-task="handleUpdateTask"
+            @add-subtask="handleAddSubtask"
+            @update-subtask-planned-at="handleUpdateSubtaskPlannedAt"
+            @toggle-subtask-completed="({ taskId, subtaskId }) => toggleSubtaskCompleted(taskId, subtaskId)"
+            @delete-subtask="({ taskId, subtaskId }) => deleteSubtask(taskId, subtaskId)"
+            @reorder-tasks="({ draggedTaskId, targetTaskId }) => reorderTasks(draggedTaskId, targetTaskId)"
+          />
         </div>
       </div>
-
-      <UndoBar :message="snackbar?.message ?? null" @undo="undoLastAction" />
     </div>
-  </a-config-provider>
+
+    <UndoBar :message="snackbar?.message ?? null" @undo="undoLastAction" />
+  </div>
 </template>
 
 <style scoped>

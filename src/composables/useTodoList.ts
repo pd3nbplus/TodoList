@@ -146,6 +146,15 @@ function normalizeTasks(tasks: Task[], projectIds: Set<string>): Task[] {
             text: subtask.text || '',
             completed: Boolean(subtask.completed),
             createdAt: subtask.createdAt || item.createdAt || nowIso(),
+            completedAt: subtask.completed
+              ? (subtask.completedAt && !Number.isNaN(new Date(subtask.completedAt).getTime())
+                ? subtask.completedAt
+                : item.updatedAt || item.createdAt || nowIso())
+              : null,
+            plannedAt:
+              subtask.plannedAt && !Number.isNaN(new Date(subtask.plannedAt).getTime())
+                ? subtask.plannedAt
+                : null,
           }))
         : []
 
@@ -215,6 +224,41 @@ function taskComparator(sortBy: SortMode): (a: Task, b: Task) => number {
   }
 
   return (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+}
+
+function dueDateSortComparator(a: Task, b: Task): number {
+  if (!a.dueDate && !b.dueDate) {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  }
+  if (!a.dueDate) return 1
+  if (!b.dueDate) return -1
+
+  const diff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+  if (diff !== 0) {
+    return diff
+  }
+
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+}
+
+function priorityDueSortComparator(a: Task, b: Task): number {
+  const priorityDiff = PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority]
+  if (priorityDiff !== 0) {
+    return priorityDiff
+  }
+
+  if (!a.dueDate && !b.dueDate) {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  }
+  if (!a.dueDate) return 1
+  if (!b.dueDate) return -1
+
+  const dueDiff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+  if (dueDiff !== 0) {
+    return dueDiff
+  }
+
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 }
 
 export function useTodoList() {
@@ -499,7 +543,10 @@ export function useTodoList() {
     const updated: Task = {
       ...current,
       completed,
-      subtasks: nextSubtasks,
+      subtasks: nextSubtasks.map((item) => ({
+        ...item,
+        completedAt: completed ? (item.completedAt || nowIso()) : null,
+      })),
       updatedAt: nowIso(),
     }
 
@@ -560,7 +607,7 @@ export function useTodoList() {
     selectedTaskIds.value = []
   }
 
-  function addSubtask(taskId: string, text: string): boolean {
+  function addSubtask(taskId: string, text: string, plannedAtInput?: string): boolean {
     const cleaned = text.trim()
     if (!cleaned) {
       return false
@@ -581,6 +628,8 @@ export function useTodoList() {
       text: cleaned,
       completed: false,
       createdAt: nowIso(),
+      completedAt: null,
+      plannedAt: toIsoDate(plannedAtInput || ''),
     }
 
     const updated: Task = {
@@ -611,7 +660,13 @@ export function useTodoList() {
     }
 
     const nextSubtasks = task.subtasks.map((item) =>
-      item.id === subtaskId ? { ...item, completed: !item.completed } : item,
+      item.id === subtaskId
+        ? {
+            ...item,
+            completed: !item.completed,
+            completedAt: !item.completed ? nowIso() : null,
+          }
+        : item,
     )
 
     const shouldCompleteTask = nextSubtasks.length > 0 && nextSubtasks.every((item) => item.completed)
@@ -627,6 +682,46 @@ export function useTodoList() {
       updated,
       ...tasks.value.slice(taskIndex + 1),
     ]
+  }
+
+  function setSubtaskPlannedAt(taskId: string, subtaskId: string, plannedAt: string | null) {
+    const taskIndex = tasks.value.findIndex((item) => item.id === taskId)
+    if (taskIndex === -1) {
+      return false
+    }
+
+    const task = tasks.value[taskIndex]
+    if (!task) {
+      return false
+    }
+
+    const hasSubtask = task.subtasks.some((item) => item.id === subtaskId)
+    if (!hasSubtask) {
+      return false
+    }
+
+    const normalizedPlannedAt =
+      plannedAt && !Number.isNaN(new Date(plannedAt).getTime()) ? plannedAt : null
+
+    const nextSubtasks = task.subtasks.map((item) =>
+      item.id === subtaskId
+        ? { ...item, plannedAt: normalizedPlannedAt }
+        : item,
+    )
+
+    const updated: Task = {
+      ...task,
+      subtasks: nextSubtasks,
+      updatedAt: nowIso(),
+    }
+
+    tasks.value = [
+      ...tasks.value.slice(0, taskIndex),
+      updated,
+      ...tasks.value.slice(taskIndex + 1),
+    ]
+
+    return true
   }
 
   function deleteSubtask(taskId: string, subtaskId: string) {
@@ -686,6 +781,46 @@ export function useTodoList() {
     }))
 
     filters.sortBy = 'manual'
+  }
+
+  function sortTasksByDueDate() {
+    if (tasks.value.length <= 1) {
+      return false
+    }
+
+    setUndoSnapshot('已按截止日期排序')
+
+    const sorted = [...tasks.value]
+      .sort(dueDateSortComparator)
+      .map((item, index) => ({
+        ...item,
+        manualOrder: index + 1,
+        updatedAt: nowIso(),
+      }))
+
+    tasks.value = sorted
+    filters.sortBy = 'manual'
+    return true
+  }
+
+  function sortTasksByPriorityAndDueDate() {
+    if (tasks.value.length <= 1) {
+      return false
+    }
+
+    setUndoSnapshot('已按优先级和截止日期排序')
+
+    const sorted = [...tasks.value]
+      .sort(priorityDueSortComparator)
+      .map((item, index) => ({
+        ...item,
+        manualOrder: index + 1,
+        updatedAt: nowIso(),
+      }))
+
+    tasks.value = sorted
+    filters.sortBy = 'manual'
+    return true
   }
 
   function dueStatus(task: Task): 'none' | 'overdue' | 'today' | 'tomorrow' | 'week' {
@@ -828,8 +963,11 @@ export function useTodoList() {
     clearSelectedTasks,
     addSubtask,
     toggleSubtaskCompleted,
+    setSubtaskPlannedAt,
     deleteSubtask,
     reorderTasks,
+    sortTasksByDueDate,
+    sortTasksByPriorityAndDueDate,
     dueStatus,
     dueHint,
     undoLastAction,

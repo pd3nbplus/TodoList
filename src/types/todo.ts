@@ -11,6 +11,8 @@ export interface Subtask {
   text: string
   completed: boolean
   createdAt: string
+  completedAt: string | null
+  plannedAt: string | null
 }
 
 export interface Task {
