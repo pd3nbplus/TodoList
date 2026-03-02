@@ -25,7 +25,7 @@ const {
   removeProject,
   addTask,
   updateTask,
-  toggleTaskCompleted,
+  setTaskCompleted,
   deleteTask,
   deleteSelectedTasks,
   toggleTaskSelected,
@@ -138,7 +138,7 @@ function selectAllVisible() {
               :due-hint="dueHint"
               :to-local-date-time-input-value="toLocalDateTimeInputValue"
               @toggle-task-selected="toggleTaskSelected"
-              @toggle-task-completed="toggleTaskCompleted"
+              @toggle-task-completed="({ taskId, completed }) => setTaskCompleted(taskId, completed)"
               @delete-task="deleteTask"
               @update-task="handleUpdateTask"
               @add-subtask="handleAddSubtask"

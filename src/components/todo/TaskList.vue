@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { Modal } from 'ant-design-vue'
 import type { Project, Task, TaskFormInput, TaskPriority } from '../../types/todo'
 
 const props = defineProps<{
@@ -15,7 +16,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   toggleTaskSelected: [taskId: string]
-  toggleTaskCompleted: [taskId: string]
+  toggleTaskCompleted: [payload: { taskId: string; completed: boolean }]
   deleteTask: [taskId: string]
   updateTask: [payload: { taskId: string; input: TaskFormInput }]
   addSubtask: [payload: { taskId: string; text: string }]
@@ -82,7 +83,7 @@ function cancelEdit() {
   editingTaskId.value = null
 }
 
-function handleTaskSpaceToggle(taskId: string, event: KeyboardEvent) {
+function handleTaskSpaceToggle(task: Task, event: KeyboardEvent) {
   const target = event.target as HTMLElement | null
   if (!target) {
     return
@@ -92,7 +93,33 @@ function handleTaskSpaceToggle(taskId: string, event: KeyboardEvent) {
     return
   }
 
-  emit('toggleTaskCompleted', taskId)
+  confirmToggleTaskCompleted(task)
+}
+
+function handleTaskSelectedChange(taskId: string) {
+  emit('toggleTaskSelected', taskId)
+}
+
+function handleTaskCompletedChange(task: Task) {
+  confirmToggleTaskCompleted(task)
+}
+
+function confirmToggleTaskCompleted(task: Task) {
+  const nextCompleted = !task.completed
+  Modal.confirm({
+    title: nextCompleted ? '确认完成任务？' : '确认恢复任务？',
+    content: nextCompleted
+      ? '确认后将把该任务及其所有子任务标记为完成。'
+      : '确认后将把该任务及其所有子任务恢复为未完成。',
+    okText: '确认',
+    cancelText: '取消',
+    onOk: () => {
+      emit('toggleTaskCompleted', {
+        taskId: task.id,
+        completed: nextCompleted,
+      })
+    },
+  })
 }
 
 function handleAddSubtask(taskId: string) {
@@ -105,18 +132,29 @@ function handleAddSubtask(taskId: string) {
   subtaskDrafts[taskId] = ''
 }
 
-function handleDragStart(taskId: string) {
+function resetDragState() {
+  dragTaskId.value = null
+  dragOverTaskId.value = null
+}
+
+function handleDragStart(taskId: string, event: DragEvent) {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('input,button,textarea,select,label,.ant-checkbox,.ant-checkbox-wrapper')) {
+    event.preventDefault()
+    return
+  }
+
   dragTaskId.value = taskId
 }
 
 function handleDrop(targetTaskId: string) {
   if (!dragTaskId.value || dragTaskId.value === targetTaskId) {
+    resetDragState()
     return
   }
 
   emit('reorderTasks', { draggedTaskId: dragTaskId.value, targetTaskId })
-  dragTaskId.value = null
-  dragOverTaskId.value = null
+  resetDragState()
 }
 
 function dueTagColor(task: Task): string {
@@ -150,20 +188,36 @@ function dueTagColor(task: Task): string {
         }"
         tabindex="0"
         draggable="true"
-        @dragstart="handleDragStart(task.id)"
+        @dragstart="handleDragStart(task.id, $event)"
+        @dragend="resetDragState"
         @dragover.prevent="dragOverTaskId = task.id"
         @dragleave="dragOverTaskId = null"
         @drop.prevent="handleDrop(task.id)"
-        @keydown.space.prevent="handleTaskSpaceToggle(task.id, $event)"
+        @keydown.space.prevent="handleTaskSpaceToggle(task, $event)"
       >
         <a-card :bordered="false" class="task-card">
           <div class="task-top">
             <div class="task-core">
-              <a-checkbox
-                :checked="props.selectedTaskIds.includes(task.id)"
-                @change="emit('toggleTaskSelected', task.id)"
-              />
-              <a-checkbox :checked="task.completed" @change="emit('toggleTaskCompleted', task.id)" />
+              <div class="control-group">
+                <a-checkbox
+                  :checked="props.selectedTaskIds.includes(task.id)"
+                  @mousedown.stop
+                  @click.stop
+                  @change="handleTaskSelectedChange(task.id)"
+                />
+                <span class="control-label">选择</span>
+              </div>
+              <div class="control-group">
+                <a-checkbox
+                  :checked="task.completed"
+                  @mousedown.stop
+                  @click.stop
+                  @change="handleTaskCompletedChange(task)"
+                />
+                <span class="control-label action-label" @click.stop="confirmToggleTaskCompleted(task)">
+                  完成
+                </span>
+              </div>
               <h3>{{ task.title }}</h3>
             </div>
 
@@ -293,6 +347,23 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.control-label {
+  color: #6b5a78;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.action-label {
+  cursor: pointer;
+  user-select: none;
 }
 
 .task-core h3 {

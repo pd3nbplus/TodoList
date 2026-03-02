@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, toRaw, watch } from 'vue'
 import type {
   DueFilter,
   FilterState,
@@ -53,11 +53,17 @@ function createId(prefix: string): string {
 }
 
 function deepClone<T>(value: T): T {
+  const rawValue = toRaw(value) as T
+
   if (typeof structuredClone === 'function') {
-    return structuredClone(value)
+    try {
+      return structuredClone(rawValue)
+    } catch {
+      // Fallback for non-serializable runtime wrappers.
+    }
   }
 
-  return JSON.parse(JSON.stringify(value)) as T
+  return JSON.parse(JSON.stringify(rawValue)) as T
 }
 
 function startOfDay(date: Date): Date {
@@ -472,24 +478,27 @@ export function useTodoList() {
     return true
   }
 
-  function toggleTaskCompleted(taskId: string) {
+  function setTaskCompleted(taskId: string, completed: boolean) {
     const index = tasks.value.findIndex((item) => item.id === taskId)
     if (index === -1) {
-      return
+      return false
     }
 
     const current = tasks.value[index]
     if (!current) {
-      return
+      return false
     }
 
-    setUndoSnapshot(current.completed ? '任务已恢复为未完成' : '任务已标记为完成')
+    if (current.completed === completed) {
+      return true
+    }
 
-    const nextCompleted = !current.completed
-    const nextSubtasks = current.subtasks.map((item) => ({ ...item, completed: nextCompleted }))
+    setUndoSnapshot(completed ? '任务已标记为完成' : '任务已恢复为未完成')
+
+    const nextSubtasks = current.subtasks.map((item) => ({ ...item, completed }))
     const updated: Task = {
       ...current,
-      completed: nextCompleted,
+      completed,
       subtasks: nextSubtasks,
       updatedAt: nowIso(),
     }
@@ -499,6 +508,17 @@ export function useTodoList() {
       updated,
       ...tasks.value.slice(index + 1),
     ]
+
+    return true
+  }
+
+  function toggleTaskCompleted(taskId: string) {
+    const current = tasks.value.find((item) => item.id === taskId)
+    if (!current) {
+      return
+    }
+
+    setTaskCompleted(taskId, !current.completed)
   }
 
   function deleteTask(taskId: string) {
@@ -800,6 +820,7 @@ export function useTodoList() {
     removeProject,
     addTask,
     updateTask,
+    setTaskCompleted,
     toggleTaskCompleted,
     deleteTask,
     deleteSelectedTasks,
