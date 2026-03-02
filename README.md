@@ -3,6 +3,8 @@
 一个组件化的 TodoList Web 应用，基于 Vue 3 + Vite + TypeScript + Ant Design Vue。  
 A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Design Vue.
 
+![alt text](./img/项目截图.png)
+
 ## 版本说明 Version Notes
 
 ### v1.0.0 (2026-03-02)
