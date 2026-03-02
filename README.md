@@ -9,6 +9,19 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
 
 ## 版本说明 Version Notes
 
+### V1.0.2 (2026-03-02)
+
+- 新增首页数据看板：任务完成率趋势（日/周/月）、平均任务周期、项目分布与完成情况、拖延指数。  
+  Added Home insights dashboard: completion trend (day/week/month), average task cycle, project distribution/completion, and delay index.
+- 增加深色模式切换，并修复深色样式在父级容器与时间线区域的覆盖问题（含 `todo-page`、`ant-card-body`、`timeline-body`）。  
+  Added dark mode toggle and fixed dark-theme style cascading issues across parent containers and timeline areas (including `todo-page`, `ant-card-body`, and `timeline-body`).
+- 任务列表支持键盘导航：`Tab / Shift+Tab / ↑ / ↓` 在任务项间快速切换焦点。  
+  Added keyboard navigation in task list: `Tab / Shift+Tab / ↑ / ↓` to move focus between task items.
+- 子任务预计完成时间编辑交互优化：改为“修改时间”按需展开编辑，点击空白自动取消未保存修改。  
+  Improved subtask planned-time editing UX: on-demand “Modify Time” editor with auto-cancel on outside click.
+- 按钮视觉优化：编辑按钮增强主题统一性，删除按钮保留警示特征并降低饱和度。  
+  Refined button visuals: edit button aligned with theme style; delete button keeps warning semantics with softened saturation.
+
 ### V1.0.1 (2026-03-02)
 
 - 新增左侧导航栏与页面路由：首页（任务工作台）+ 任务时序图页面。  

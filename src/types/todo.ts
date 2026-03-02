@@ -57,3 +57,36 @@ export interface TodoPersistedState {
   tasks: Task[]
   projects: Project[]
 }
+
+export interface CompletionTrendPoint {
+  label: '日' | '周' | '月'
+  windowDays: number
+  totalCreated: number
+  completed: number
+  completionRate: number
+}
+
+export interface ProjectProgressItem {
+  projectId: string
+  projectName: string
+  total: number
+  completed: number
+  completionRate: number
+  overdue: number
+}
+
+export interface DelayMetrics {
+  index: number | null
+  averageDeviationHours: number | null
+  delayedRate: number | null
+  sampleCount: number
+}
+
+export interface TodoInsights {
+  completionTrend: CompletionTrendPoint[]
+  averageTaskCycleHours: number | null
+  averageTaskCycleDays: number | null
+  completedTaskCount: number
+  projectProgress: ProjectProgressItem[]
+  delay: DelayMetrics
+}

@@ -60,7 +60,10 @@ function submitProject() {
         </a-button>
         <a-button
           v-if="project.id !== props.defaultProjectId"
+          size="small"
+          type="primary"
           danger
+          class="delete-project-btn"
           @click="emit('removeProject', project.id)"
         >
           删除
@@ -110,5 +113,16 @@ function submitProject() {
 
 .project-select {
   text-align: left;
+}
+
+.delete-project-btn {
+  background: rgba(196, 69, 100, 0.9);
+  border-color: rgba(196, 69, 100, 0.9);
+}
+
+.delete-project-btn:hover,
+.delete-project-btn:focus {
+  background: rgba(208, 91, 119, 0.9);
+  border-color: rgba(208, 91, 119, 0.9);
 }
 </style>

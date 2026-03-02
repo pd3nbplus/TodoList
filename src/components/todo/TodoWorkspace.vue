@@ -9,6 +9,7 @@ import TaskComposer from './TaskComposer.vue'
 import TaskList from './TaskList.vue'
 import TaskToolbar from './TaskToolbar.vue'
 import TodoHeader from './TodoHeader.vue'
+import TodoInsights from './TodoInsights.vue'
 import UndoBar from './UndoBar.vue'
 
 const {
@@ -16,6 +17,7 @@ const {
   filters,
   visibleTasks,
   stats,
+  insights,
   selectedTaskIds,
   snackbar,
   defaultProjectId,
@@ -97,6 +99,7 @@ function selectAllVisible() {
 
     <div class="workspace">
       <TodoHeader :stats="stats" />
+      <TodoInsights :insights="insights" />
 
       <div class="content-grid">
         <ProjectSidebar
@@ -160,6 +163,25 @@ function selectAllVisible() {
   padding: 20px 14px 64px;
   position: relative;
   overflow: hidden;
+}
+
+:deep(.app-layout.dark-mode .todo-page) {
+  background: radial-gradient(circle at top, #1f2532, #151d29 46%, #101722 100%);
+}
+
+:deep(.app-layout.dark-mode .todo-page .ant-card) {
+  border: 1px solid #2a3445;
+  box-shadow: none;
+}
+
+:deep(.app-layout.dark-mode .todo-page .ant-card .ant-card-body) {
+  background: #171f2c;
+  color: #e7edf7;
+}
+
+:deep(.app-layout.dark-mode .todo-page .ant-card .ant-card-head) {
+  background: #171f2c;
+  border-bottom-color: #2a3445;
 }
 
 .glow {

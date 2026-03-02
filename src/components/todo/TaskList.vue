@@ -34,6 +34,7 @@ const subtaskDrafts = reactive<Record<string, string>>({})
 const subtaskPlanDrafts = reactive<Record<string, string>>({})
 const editingSubtaskPlanKey = ref<string | null>(null)
 const subtaskPlanEditorRefs = reactive<Record<string, HTMLElement | null>>({})
+const taskItemRefs = ref<Array<HTMLElement | null>>([])
 
 const editForm = reactive<TaskFormInput>({
   title: '',
@@ -240,6 +241,59 @@ function handleDrop(targetTaskId: string) {
   resetDragState()
 }
 
+function setTaskItemRef(index: number, el: Element | ComponentPublicInstance | null) {
+  if (el && '$el' in el) {
+    taskItemRefs.value[index] = (el.$el as HTMLElement | null) ?? null
+    return
+  }
+
+  taskItemRefs.value[index] = (el as HTMLElement | null) ?? null
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(
+    target.closest('input,textarea,select,button,a,label,.ant-checkbox-wrapper,.ant-input,.ant-select'),
+  )
+}
+
+function focusTaskByIndex(index: number) {
+  const el = taskItemRefs.value[index]
+  el?.focus()
+}
+
+function handleTaskArrowNavigation(index: number, step: number, event: KeyboardEvent) {
+  if (isInteractiveTarget(event.target)) {
+    return
+  }
+
+  const nextIndex = index + step
+  if (nextIndex < 0 || nextIndex >= props.tasks.length) {
+    return
+  }
+
+  event.preventDefault()
+  focusTaskByIndex(nextIndex)
+}
+
+function handleTaskTabNavigation(index: number, event: KeyboardEvent) {
+  if (isInteractiveTarget(event.target)) {
+    return
+  }
+
+  const step = event.shiftKey ? -1 : 1
+  const nextIndex = index + step
+  if (nextIndex < 0 || nextIndex >= props.tasks.length) {
+    return
+  }
+
+  event.preventDefault()
+  focusTaskByIndex(nextIndex)
+}
+
 function dueTagColor(task: Task): string {
   const status = props.dueStatus(task)
   if (status === 'overdue') return 'red'
@@ -287,7 +341,7 @@ onBeforeUnmount(() => {
 
     <div v-else class="task-list">
       <article
-        v-for="task in props.tasks"
+        v-for="(task, index) in props.tasks"
         :key="task.id"
         class="task-item"
         :class="{
@@ -296,6 +350,7 @@ onBeforeUnmount(() => {
           done: task.completed,
         }"
         tabindex="0"
+        :ref="(el) => setTaskItemRef(index, el)"
         draggable="true"
         @dragstart="handleDragStart(task.id, $event)"
         @dragend="resetDragState"
@@ -303,6 +358,9 @@ onBeforeUnmount(() => {
         @dragleave="dragOverTaskId = null"
         @drop.prevent="handleDrop(task.id)"
         @keydown.space.prevent="handleTaskSpaceToggle(task, $event)"
+        @keydown.up="handleTaskArrowNavigation(index, -1, $event)"
+        @keydown.down="handleTaskArrowNavigation(index, 1, $event)"
+        @keydown.tab="handleTaskTabNavigation(index, $event)"
       >
         <a-card :bordered="false" class="task-card">
           <div class="task-top">
@@ -331,8 +389,16 @@ onBeforeUnmount(() => {
             </div>
 
             <a-space>
-              <a-button size="small" @click="beginEdit(task)">编辑</a-button>
-              <a-button size="small" danger @click="emit('deleteTask', task.id)">删除</a-button>
+              <a-button size="small" type="primary" class="edit-action-btn" @click="beginEdit(task)">编辑</a-button>
+              <a-button
+                size="small"
+                type="primary"
+                danger
+                class="delete-action-btn"
+                @click="emit('deleteTask', task.id)"
+              >
+                删除
+              </a-button>
             </a-space>
           </div>
 
@@ -412,8 +478,10 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
                 <a-button
-                  type="link"
+                  size="small"
+                  type="primary"
                   danger
+                  class="delete-action-btn"
                   @click="emit('deleteSubtask', { taskId: task.id, subtaskId: subtask.id })"
                 >
                   删除
@@ -516,6 +584,28 @@ h2 {
 .task-core h3 {
   margin: 0;
   font-size: 16px;
+}
+
+.edit-action-btn {
+  background: #a29bfe;
+  border-color: #a29bfe;
+}
+
+.edit-action-btn:hover,
+.edit-action-btn:focus {
+  background: #b2acff;
+  border-color: #b2acff;
+}
+
+.delete-action-btn {
+  background: rgba(196, 69, 100, 0.9);
+  border-color: rgba(196, 69, 100, 0.9);
+}
+
+.delete-action-btn:hover,
+.delete-action-btn:focus {
+  background: rgba(208, 91, 119, 0.9);
+  border-color: rgba(208, 91, 119, 0.9);
 }
 
 .meta-row {

@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApartmentOutlined, HomeOutlined } from '@ant-design/icons-vue'
+import { theme as antdTheme } from 'ant-design-vue'
 
 const router = useRouter()
 const route = useRoute()
 const collapsed = ref(false)
+const darkMode = ref(false)
+const THEME_STORAGE_KEY = 'todo-theme-mode'
 
 const menuItems = [
   {
@@ -28,7 +31,8 @@ const selectedKeys = computed(() => {
   return ['/']
 })
 
-const themeConfig = {
+const themeConfig = computed(() => ({
+  algorithm: darkMode.value ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
   token: {
     colorPrimary: '#9b59b6',
     colorInfo: '#9b59b6',
@@ -36,18 +40,46 @@ const themeConfig = {
     borderRadius: 12,
     fontSize: 14,
   },
-}
+}))
 
 function onMenuClick({ key }: { key: string }) {
   if (key !== route.path) {
     void router.push(key)
   }
 }
+
+function applyGlobalThemeClass(enabled: boolean) {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  document.documentElement.classList.toggle('app-dark', enabled)
+  document.body.classList.toggle('app-dark', enabled)
+}
+
+onMounted(() => {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+
+  darkMode.value = localStorage.getItem(THEME_STORAGE_KEY) === 'dark'
+  applyGlobalThemeClass(darkMode.value)
+})
+
+watch(darkMode, (value) => {
+  if (typeof localStorage === 'undefined') {
+    applyGlobalThemeClass(value)
+    return
+  }
+
+  localStorage.setItem(THEME_STORAGE_KEY, value ? 'dark' : 'light')
+  applyGlobalThemeClass(value)
+})
 </script>
 
 <template>
   <a-config-provider :theme="themeConfig">
-    <a-layout class="app-layout">
+    <a-layout class="app-layout" :class="{ 'dark-mode': darkMode }">
       <a-layout-sider
         v-model:collapsed="collapsed"
         width="236"
@@ -58,7 +90,7 @@ function onMenuClick({ key }: { key: string }) {
           <div class="dot"></div>
           <div class="text">
             <strong>TodoList</strong>
-            <small>V1.0.1</small>
+            <small>V1.0.2</small>
           </div>
         </div>
 
@@ -69,6 +101,11 @@ function onMenuClick({ key }: { key: string }) {
           :selected-keys="selectedKeys"
           @click="onMenuClick"
         />
+
+        <div class="theme-toggle" :class="{ collapsed }">
+          <span v-if="!collapsed">深色模式</span>
+          <a-switch v-model:checked="darkMode" />
+        </div>
       </a-layout-sider>
 
       <a-layout class="app-main">
@@ -104,13 +141,42 @@ function onMenuClick({ key }: { key: string }) {
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow: auto;
+  overflow: hidden;
+}
+
+.app-sider :deep(.ant-layout-sider-children) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .app-main {
   min-width: 0;
   height: 100vh;
   overflow: hidden;
+}
+
+.theme-toggle {
+  margin: 10px 12px 12px;
+  margin-top: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f8eeff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.theme-toggle.collapsed {
+  justify-content: center;
+}
+
+.app-sider .theme-toggle {
+  margin-top: auto !important;
 }
 
 .brand {
@@ -147,6 +213,9 @@ function onMenuClick({ key }: { key: string }) {
   background: transparent;
   border-inline-end: none;
   color: #f4e8ff;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 :deep(.ant-menu-item-selected) {
@@ -171,6 +240,43 @@ function onMenuClick({ key }: { key: string }) {
   overflow: auto;
   padding: 12px;
   background: #f6eefb;
+}
+
+.app-layout.dark-mode {
+  background: #10141c;
+}
+
+.app-layout.dark-mode .app-sider {
+  background: linear-gradient(180deg, #20162a, #352042 45%, #4c2f60 100%);
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+.app-layout.dark-mode .app-header {
+  background: #141a23;
+  border-bottom-color: #2b3140;
+}
+
+.app-layout.dark-mode .app-content {
+  background: #0f1520;
+}
+
+.app-layout.dark-mode .theme-toggle {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.app-layout.dark-mode .todo-page) {
+  background: radial-gradient(circle at top, #1f2330, #121924 46%, #0f1621 100%);
+}
+
+:deep(.app-layout.dark-mode .ant-card) {
+  background: #171f2c;
+  color: #e9edf4;
+}
+
+:deep(.app-layout.dark-mode .ant-typography),
+:deep(.app-layout.dark-mode .ant-statistic-title),
+:deep(.app-layout.dark-mode .ant-statistic-content) {
+  color: #d8deea;
 }
 
 @media (max-width: 900px) {

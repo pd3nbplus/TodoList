@@ -1,12 +1,16 @@
 import { computed, onMounted, onUnmounted, reactive, ref, toRaw, watch } from 'vue'
 import type {
+  CompletionTrendPoint,
+  DelayMetrics,
   DueFilter,
   FilterState,
   Project,
+  ProjectProgressItem,
   SortMode,
   Subtask,
   Task,
   TaskFormInput,
+  TodoInsights,
   TaskPriority,
   TodoPersistedState,
 } from '../types/todo'
@@ -64,6 +68,40 @@ function deepClone<T>(value: T): T {
   }
 
   return JSON.parse(JSON.stringify(rawValue)) as T
+}
+
+function parseIsoTime(iso: string | null | undefined): number | null {
+  if (!iso) {
+    return null
+  }
+
+  const ms = new Date(iso).getTime()
+  if (Number.isNaN(ms)) {
+    return null
+  }
+
+  return ms
+}
+
+function inferTaskCompletedAtMs(task: Task): number | null {
+  if (!task.completed) {
+    return null
+  }
+
+  const updatedAtMs = parseIsoTime(task.updatedAt)
+  if (task.subtasks.length === 0) {
+    return updatedAtMs
+  }
+
+  const subtaskCompletedMs = task.subtasks
+    .map((subtask) => parseIsoTime(subtask.completedAt))
+    .filter((ms): ms is number => ms !== null)
+
+  if (subtaskCompletedMs.length === task.subtasks.length) {
+    return Math.max(...subtaskCompletedMs)
+  }
+
+  return updatedAtMs
 }
 
 function startOfDay(date: Date): Date {
@@ -906,6 +944,119 @@ export function useTodoList() {
     return { total, active, completed, overdue }
   })
 
+  const insights = computed<TodoInsights>(() => {
+    const now = Date.now()
+    const dayMs = 24 * 60 * 60 * 1000
+    const trendConfigs: Array<{ label: CompletionTrendPoint['label']; windowDays: number }> = [
+      { label: '日', windowDays: 1 },
+      { label: '周', windowDays: 7 },
+      { label: '月', windowDays: 30 },
+    ]
+
+    const completionTrend = trendConfigs.map(({ label, windowDays }) => {
+      const rangeStart = now - windowDays * dayMs
+      const createdTasks = tasks.value.filter((task) => {
+        const createdAtMs = parseIsoTime(task.createdAt)
+        return createdAtMs !== null && createdAtMs >= rangeStart
+      })
+      const completed = createdTasks.filter((task) => task.completed).length
+      const totalCreated = createdTasks.length
+      const completionRate = totalCreated > 0 ? (completed / totalCreated) * 100 : 0
+
+      return {
+        label,
+        windowDays,
+        totalCreated,
+        completed,
+        completionRate,
+      }
+    })
+
+    const cycleHours: number[] = []
+    for (const task of tasks.value) {
+      if (!task.completed) {
+        continue
+      }
+
+      const createdAtMs = parseIsoTime(task.createdAt)
+      const completedAtMs = inferTaskCompletedAtMs(task)
+      if (createdAtMs === null || completedAtMs === null || completedAtMs < createdAtMs) {
+        continue
+      }
+
+      cycleHours.push((completedAtMs - createdAtMs) / (1000 * 60 * 60))
+    }
+
+    const averageTaskCycleHours = cycleHours.length > 0
+      ? cycleHours.reduce((sum, hours) => sum + hours, 0) / cycleHours.length
+      : null
+    const averageTaskCycleDays = averageTaskCycleHours === null ? null : averageTaskCycleHours / 24
+
+    const projectProgress: ProjectProgressItem[] = projects.value.map((project) => {
+      const projectTasks = tasks.value.filter((task) => task.projectId === project.id)
+      const completed = projectTasks.filter((task) => task.completed).length
+      const overdue = projectTasks.filter((task) => dueStatus(task) === 'overdue').length
+      const total = projectTasks.length
+      const completionRate = total > 0 ? (completed / total) * 100 : 0
+
+      return {
+        projectId: project.id,
+        projectName: project.name,
+        total,
+        completed,
+        completionRate,
+        overdue,
+      }
+    })
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total)
+
+    const deviationHoursSamples: number[] = []
+    for (const task of tasks.value) {
+      for (const subtask of task.subtasks) {
+        const plannedAtMs = parseIsoTime(subtask.plannedAt)
+        const completedAtMs = parseIsoTime(subtask.completedAt)
+        if (plannedAtMs === null || completedAtMs === null) {
+          continue
+        }
+
+        deviationHoursSamples.push((completedAtMs - plannedAtMs) / (1000 * 60 * 60))
+      }
+    }
+
+    let delay: DelayMetrics
+    if (deviationHoursSamples.length === 0) {
+      delay = {
+        index: null,
+        averageDeviationHours: null,
+        delayedRate: null,
+        sampleCount: 0,
+      }
+    } else {
+      const delayedCount = deviationHoursSamples.filter((value) => value > 0).length
+      const delayedRate = (delayedCount / deviationHoursSamples.length) * 100
+      const averageDeviationHours =
+        deviationHoursSamples.reduce((sum, value) => sum + value, 0) / deviationHoursSamples.length
+
+      delay = {
+        // 拖延指数定义为：有计划时间的子任务中，延迟完成的比例（0-100）
+        index: delayedRate,
+        averageDeviationHours,
+        delayedRate,
+        sampleCount: deviationHoursSamples.length,
+      }
+    }
+
+    return {
+      completionTrend,
+      averageTaskCycleHours,
+      averageTaskCycleDays,
+      completedTaskCount: cycleHours.length,
+      projectProgress,
+      delay,
+    }
+  })
+
   onMounted(() => {
     loadState()
     syncNotificationPermission()
@@ -945,6 +1096,7 @@ export function useTodoList() {
     filters,
     visibleTasks,
     stats,
+    insights,
     selectedTaskIds,
     snackbar,
     defaultProjectId: DEFAULT_PROJECT_ID,
