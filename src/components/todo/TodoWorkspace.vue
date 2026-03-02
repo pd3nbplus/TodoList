@@ -1,0 +1,214 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { message } from 'ant-design-vue'
+import { useTodoList } from '../../composables/useTodoList'
+import type { FilterState, TaskFormInput } from '../../types/todo'
+import ProjectSidebar from './ProjectSidebar.vue'
+import TaskBulkActions from './TaskBulkActions.vue'
+import TaskComposer from './TaskComposer.vue'
+import TaskList from './TaskList.vue'
+import TaskToolbar from './TaskToolbar.vue'
+import TodoHeader from './TodoHeader.vue'
+import UndoBar from './UndoBar.vue'
+
+const {
+  projects,
+  filters,
+  visibleTasks,
+  stats,
+  selectedTaskIds,
+  snackbar,
+  defaultProjectId,
+  projectNameById,
+  notificationPermission,
+  addProject,
+  removeProject,
+  addTask,
+  updateTask,
+  toggleTaskCompleted,
+  deleteTask,
+  deleteSelectedTasks,
+  toggleTaskSelected,
+  clearSelectedTasks,
+  addSubtask,
+  toggleSubtaskCompleted,
+  deleteSubtask,
+  reorderTasks,
+  dueStatus,
+  dueHint,
+  undoLastAction,
+  formatDueDate,
+  requestNotificationAccess,
+  toLocalDateTimeInputValue,
+} = useTodoList()
+
+const selectedCount = computed(() => selectedTaskIds.value.length)
+
+const themeConfig = {
+  token: {
+    colorPrimary: '#9b59b6',
+    colorInfo: '#9b59b6',
+    colorLink: '#8e44ad',
+    borderRadius: 12,
+    fontSize: 14,
+  },
+}
+
+function handleCreateTask(payload: TaskFormInput) {
+  const added = addTask(payload)
+  if (!added) {
+    message.warning('任务标题不能为空')
+  }
+}
+
+function handleUpdateTask(payload: { taskId: string; input: TaskFormInput }) {
+  const saved = updateTask(payload.taskId, payload.input)
+  if (!saved) {
+    message.warning('保存失败，请检查任务标题')
+  }
+}
+
+function handleAddSubtask(payload: { taskId: string; text: string }) {
+  const added = addSubtask(payload.taskId, payload.text)
+  if (!added) {
+    message.warning('子任务内容不能为空')
+  }
+}
+
+function handleAddProject(name: string) {
+  const created = addProject(name)
+  if (!created) {
+    message.warning('清单名称不能为空或已存在')
+  }
+}
+
+function handleUpdateFilters(patch: Partial<FilterState>) {
+  Object.assign(filters, patch)
+}
+
+function selectAllVisible() {
+  selectedTaskIds.value = visibleTasks.value.map((item) => item.id)
+}
+</script>
+
+<template>
+  <a-config-provider :theme="themeConfig">
+    <div class="todo-page">
+      <div class="glow glow-left"></div>
+      <div class="glow glow-right"></div>
+
+      <div class="workspace">
+        <TodoHeader :stats="stats" />
+
+        <div class="content-grid">
+          <ProjectSidebar
+            :projects="projects"
+            :selected-project-id="filters.projectId"
+            :default-project-id="defaultProjectId"
+            :notification-permission="notificationPermission"
+            @add-project="handleAddProject"
+            @select-project="(projectId) => (filters.projectId = projectId)"
+            @remove-project="removeProject"
+            @request-notification="requestNotificationAccess"
+          />
+
+          <div class="main-stack">
+            <TaskComposer
+              :projects="projects"
+              :default-project-id="defaultProjectId"
+              @create-task="handleCreateTask"
+            />
+
+            <TaskToolbar :filters="filters" @update-filters="handleUpdateFilters" />
+
+            <TaskBulkActions
+              :selected-count="selectedCount"
+              @delete-selected="deleteSelectedTasks"
+              @clear-selected="clearSelectedTasks"
+              @select-all-visible="selectAllVisible"
+            />
+
+            <TaskList
+              :tasks="visibleTasks"
+              :projects="projects"
+              :selected-task-ids="selectedTaskIds"
+              :project-name-by-id="projectNameById"
+              :format-due-date="formatDueDate"
+              :due-status="dueStatus"
+              :due-hint="dueHint"
+              :to-local-date-time-input-value="toLocalDateTimeInputValue"
+              @toggle-task-selected="toggleTaskSelected"
+              @toggle-task-completed="toggleTaskCompleted"
+              @delete-task="deleteTask"
+              @update-task="handleUpdateTask"
+              @add-subtask="handleAddSubtask"
+              @toggle-subtask-completed="({ taskId, subtaskId }) => toggleSubtaskCompleted(taskId, subtaskId)"
+              @delete-subtask="({ taskId, subtaskId }) => deleteSubtask(taskId, subtaskId)"
+              @reorder-tasks="({ draggedTaskId, targetTaskId }) => reorderTasks(draggedTaskId, targetTaskId)"
+            />
+          </div>
+        </div>
+      </div>
+
+      <UndoBar :message="snackbar?.message ?? null" @undo="undoLastAction" />
+    </div>
+  </a-config-provider>
+</template>
+
+<style scoped>
+.todo-page {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #f3e8fa, #fcf9fe 44%, #f7eefc 100%);
+  padding: 20px 14px 64px;
+  position: relative;
+  overflow: hidden;
+}
+
+.glow {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.48;
+  pointer-events: none;
+}
+
+.glow-left {
+  background: #c39bd3;
+  left: -180px;
+  top: -160px;
+}
+
+.glow-right {
+  background: #f5b7b1;
+  right: -180px;
+  top: -120px;
+}
+
+.workspace {
+  max-width: 1280px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 12px;
+}
+
+.main-stack {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 1024px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
