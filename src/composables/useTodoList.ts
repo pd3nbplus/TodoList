@@ -762,6 +762,48 @@ export function useTodoList() {
     return true
   }
 
+  function setSubtaskText(taskId: string, subtaskId: string, text: string) {
+    const cleaned = text.trim()
+    if (!cleaned) {
+      return false
+    }
+
+    const taskIndex = tasks.value.findIndex((item) => item.id === taskId)
+    if (taskIndex === -1) {
+      return false
+    }
+
+    const task = tasks.value[taskIndex]
+    if (!task) {
+      return false
+    }
+
+    const hasSubtask = task.subtasks.some((item) => item.id === subtaskId)
+    if (!hasSubtask) {
+      return false
+    }
+
+    const nextSubtasks = task.subtasks.map((item) =>
+      item.id === subtaskId
+        ? { ...item, text: cleaned }
+        : item,
+    )
+
+    const updated: Task = {
+      ...task,
+      subtasks: nextSubtasks,
+      updatedAt: nowIso(),
+    }
+
+    tasks.value = [
+      ...tasks.value.slice(0, taskIndex),
+      updated,
+      ...tasks.value.slice(taskIndex + 1),
+    ]
+
+    return true
+  }
+
   function deleteSubtask(taskId: string, subtaskId: string) {
     const taskIndex = tasks.value.findIndex((item) => item.id === taskId)
     if (taskIndex === -1) {
@@ -809,8 +851,9 @@ export function useTodoList() {
     }
 
     ordered.splice(fromIndex, 1)
-    const insertIndex = fromIndex < toIndex ? toIndex - 1 : toIndex
-    ordered.splice(insertIndex, 0, draggedTask)
+    // Drop semantics: place dragged item at target's current position.
+    // This keeps upward/downward drag behavior consistent (including adjacent swaps).
+    ordered.splice(toIndex, 0, draggedTask)
 
     tasks.value = ordered.map((item, index) => ({
       ...item,
@@ -941,7 +984,41 @@ export function useTodoList() {
     const completed = tasks.value.filter((item) => item.completed).length
     const active = total - completed
     const overdue = tasks.value.filter((item) => dueStatus(item) === 'overdue').length
-    return { total, active, completed, overdue }
+
+    const totalSubtasks = tasks.value.reduce((sum, item) => sum + item.subtasks.length, 0)
+    const activeSubtasks = tasks.value.reduce(
+      (sum, item) => sum + item.subtasks.filter((subtask) => !subtask.completed).length,
+      0,
+    )
+    const completedSubtasks = totalSubtasks - activeSubtasks
+
+    // 进度统计优先使用子任务；无子任务的任务按 1 个进度单元计算。
+    let totalProgressUnits = 0
+    let completedProgressUnits = 0
+    for (const task of tasks.value) {
+      if (task.subtasks.length > 0) {
+        totalProgressUnits += task.subtasks.length
+        completedProgressUnits += task.subtasks.filter((subtask) => subtask.completed).length
+      } else {
+        totalProgressUnits += 1
+        completedProgressUnits += task.completed ? 1 : 0
+      }
+    }
+
+    const subtaskCompletionRate = totalProgressUnits > 0
+      ? Number(((completedProgressUnits / totalProgressUnits) * 100).toFixed(1))
+      : 0
+
+    return {
+      total,
+      active,
+      completed,
+      overdue,
+      totalSubtasks,
+      activeSubtasks,
+      completedSubtasks,
+      subtaskCompletionRate,
+    }
   })
 
   const insights = computed<TodoInsights>(() => {
@@ -998,6 +1075,12 @@ export function useTodoList() {
       const overdue = projectTasks.filter((task) => dueStatus(task) === 'overdue').length
       const total = projectTasks.length
       const completionRate = total > 0 ? (completed / total) * 100 : 0
+      const totalSubtasks = projectTasks.reduce((sum, task) => sum + task.subtasks.length, 0)
+      const completedSubtasks = projectTasks.reduce(
+        (sum, task) => sum + task.subtasks.filter((subtask) => subtask.completed).length,
+        0,
+      )
+      const subtaskCompletionRate = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0
 
       return {
         projectId: project.id,
@@ -1006,10 +1089,12 @@ export function useTodoList() {
         completed,
         completionRate,
         overdue,
+        totalSubtasks,
+        completedSubtasks,
+        subtaskCompletionRate,
       }
     })
-      .filter((item) => item.total > 0)
-      .sort((a, b) => b.total - a.total)
+      .sort((a, b) => b.total - a.total || a.projectName.localeCompare(b.projectName, 'zh-CN'))
 
     const deviationHoursSamples: number[] = []
     for (const task of tasks.value) {
@@ -1116,6 +1201,7 @@ export function useTodoList() {
     addSubtask,
     toggleSubtaskCompleted,
     setSubtaskPlannedAt,
+    setSubtaskText,
     deleteSubtask,
     reorderTasks,
     sortTasksByDueDate,

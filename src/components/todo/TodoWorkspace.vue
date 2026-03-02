@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useTodoList } from '../../composables/useTodoList'
 import type { FilterState, TaskFormInput } from '../../types/todo'
 import ProjectSidebar from './ProjectSidebar.vue'
@@ -13,6 +14,7 @@ import TodoInsights from './TodoInsights.vue'
 import UndoBar from './UndoBar.vue'
 
 const {
+  tasks,
   projects,
   filters,
   visibleTasks,
@@ -35,6 +37,7 @@ const {
   addSubtask,
   toggleSubtaskCompleted,
   setSubtaskPlannedAt,
+  setSubtaskText,
   deleteSubtask,
   reorderTasks,
   dueStatus,
@@ -47,6 +50,9 @@ const {
 } = useTodoList()
 
 const selectedCount = computed(() => selectedTaskIds.value.length)
+const route = useRoute()
+const router = useRouter()
+let locateHighlightTimer: number | null = null
 
 function handleCreateTask(payload: TaskFormInput) {
   const added = addTask(payload)
@@ -76,6 +82,15 @@ function handleUpdateSubtaskPlannedAt(payload: { taskId: string; subtaskId: stri
   }
 }
 
+function handleUpdateSubtaskText(payload: { taskId: string; subtaskId: string; text: string }) {
+  const saved = setSubtaskText(payload.taskId, payload.subtaskId, payload.text)
+  if (saved) {
+    message.success('已更新子任务名称')
+    return
+  }
+  message.warning('子任务内容不能为空')
+}
+
 function handleAddProject(name: string) {
   const created = addProject(name)
   if (!created) {
@@ -90,6 +105,108 @@ function handleUpdateFilters(patch: Partial<FilterState>) {
 function selectAllVisible() {
   selectedTaskIds.value = visibleTasks.value.map((item) => item.id)
 }
+
+function locateQueryValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+function clearLocateQuery() {
+  if (!route.query.taskId && !route.query.subtaskId) {
+    return
+  }
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.taskId
+  delete nextQuery.subtaskId
+  void router.replace({ query: nextQuery })
+}
+
+function highlightLocatedElement(element: HTMLElement) {
+  if (locateHighlightTimer !== null) {
+    window.clearTimeout(locateHighlightTimer)
+    locateHighlightTimer = null
+  }
+
+  element.classList.remove('locate-flash')
+  void element.offsetWidth
+  element.classList.add('locate-flash')
+  locateHighlightTimer = window.setTimeout(() => {
+    element.classList.remove('locate-flash')
+    locateHighlightTimer = null
+  }, 1800)
+}
+
+async function locateFromRouteQuery() {
+  if (route.name !== 'home') {
+    return
+  }
+
+  const taskId = locateQueryValue(route.query.taskId)
+  if (!taskId) {
+    return
+  }
+
+  const subtaskId = locateQueryValue(route.query.subtaskId)
+
+  // Ensure target is visible before trying to scroll to it.
+  Object.assign(filters, {
+    search: '',
+    status: 'all',
+    priority: 'all',
+    projectId: 'all',
+    due: 'all',
+  } satisfies Partial<FilterState>)
+
+  await nextTick()
+  await nextTick()
+
+  const targetId = subtaskId ? `subtask-item-${taskId}-${subtaskId}` : `task-item-${taskId}`
+  const fallbackTaskId = `task-item-${taskId}`
+  const target =
+    document.getElementById(targetId) ??
+    (subtaskId ? document.getElementById(fallbackTaskId) : null)
+
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    highlightLocatedElement(target)
+    clearLocateQuery()
+    return
+  }
+
+  if (tasks.value.length === 0) {
+    return
+  }
+
+  if (targetId !== fallbackTaskId) {
+    const taskOnlyTarget = document.getElementById(fallbackTaskId)
+    if (taskOnlyTarget) {
+      taskOnlyTarget.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      highlightLocatedElement(taskOnlyTarget)
+      clearLocateQuery()
+      return
+    }
+  }
+
+  {
+    message.warning('未找到目标任务，可能已被删除')
+    clearLocateQuery()
+  }
+}
+
+watch(
+  () => [route.name, route.query.taskId, route.query.subtaskId, tasks.value.length],
+  () => {
+    void locateFromRouteQuery()
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  if (locateHighlightTimer !== null) {
+    window.clearTimeout(locateHighlightTimer)
+    locateHighlightTimer = null
+  }
+})
 </script>
 
 <template>
@@ -143,6 +260,7 @@ function selectAllVisible() {
             @delete-task="deleteTask"
             @update-task="handleUpdateTask"
             @add-subtask="handleAddSubtask"
+            @update-subtask-text="handleUpdateSubtaskText"
             @update-subtask-planned-at="handleUpdateSubtaskPlannedAt"
             @toggle-subtask-completed="({ taskId, subtaskId }) => toggleSubtaskCompleted(taskId, subtaskId)"
             @delete-subtask="({ taskId, subtaskId }) => deleteSubtask(taskId, subtaskId)"
@@ -229,6 +347,22 @@ function selectAllVisible() {
 @media (max-width: 1024px) {
   .content-grid {
     grid-template-columns: 1fr;
+  }
+}
+</style>
+<style scoped>
+.todo-page :deep(.locate-flash) {
+  animation: locatePulse 1.8s ease-out;
+}
+
+@keyframes locatePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.5);
+    background: rgba(82, 196, 26, 0.16);
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgba(82, 196, 26, 0);
+    background: transparent;
   }
 }
 </style>

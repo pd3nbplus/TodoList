@@ -103,16 +103,27 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
       </a-col>
     </a-row>
 
-    <a-card size="small" class="inner-card project-card" title="各项目任务分布与完成情况">
+    <a-card size="small" class="inner-card project-card" title="各清单任务分布与完成情况">
       <a-empty v-if="props.insights.projectProgress.length === 0" description="暂无项目任务数据" />
 
       <div v-else class="project-list">
         <div v-for="item in props.insights.projectProgress" :key="item.projectId" class="project-item">
           <div class="project-top">
             <strong>{{ item.projectName }}</strong>
-            <span>{{ item.completed }}/{{ item.total }} · 逾期 {{ item.overdue }}</span>
+            <span>任务 {{ item.completed }}/{{ item.total }} · 逾期 {{ item.overdue }}</span>
+          </div>
+
+          <div class="project-progress-head">
+            <span>任务进度</span>
+            <span>{{ item.completed }}/{{ item.total }}</span>
           </div>
           <a-progress :percent="Number(item.completionRate.toFixed(1))" size="small" />
+
+          <div class="project-progress-head">
+            <span>子任务进度</span>
+            <span>{{ item.completedSubtasks }}/{{ item.totalSubtasks }}</span>
+          </div>
+          <a-progress :percent="Number(item.subtaskCompletionRate.toFixed(1))" size="small" />
         </div>
       </div>
     </a-card>
@@ -178,6 +189,13 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
   justify-content: space-between;
   font-size: 12px;
   color: #5e4f69;
+}
+
+.project-progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #7a6c86;
 }
 
 :deep(.app-layout.dark-mode .insight-card) {

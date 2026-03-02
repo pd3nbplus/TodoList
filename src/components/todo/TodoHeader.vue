@@ -5,6 +5,10 @@ const props = defineProps<{
     active: number
     completed: number
     overdue: number
+    totalSubtasks: number
+    activeSubtasks: number
+    completedSubtasks: number
+    subtaskCompletionRate: number
   }
 }>()
 </script>
@@ -22,12 +26,17 @@ const props = defineProps<{
     <a-row :gutter="[12, 12]" class="stats-row">
       <a-col :xs="12" :sm="6">
         <a-statistic title="总任务" :value="props.stats.total" />
+        <p class="stat-note">子任务 {{ props.stats.totalSubtasks }}</p>
       </a-col>
       <a-col :xs="12" :sm="6">
         <a-statistic title="未完成" :value="props.stats.active" />
+        <p class="stat-note">子任务 {{ props.stats.activeSubtasks }}</p>
       </a-col>
       <a-col :xs="12" :sm="6">
         <a-statistic title="已完成" :value="props.stats.completed" />
+        <p class="stat-note">
+          子项进度 {{ props.stats.subtaskCompletionRate }}%（{{ props.stats.completedSubtasks }}/{{ props.stats.totalSubtasks }}）
+        </p>
       </a-col>
       <a-col :xs="12" :sm="6">
         <a-statistic title="逾期" :value="props.stats.overdue" :value-style="{ color: '#e67e22' }" />
@@ -62,5 +71,11 @@ h1 {
 
 .stats-row {
   margin-top: 14px;
+}
+
+.stat-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #7a6c86;
 }
 </style>

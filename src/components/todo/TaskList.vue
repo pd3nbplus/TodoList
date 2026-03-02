@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
-import { Modal } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
+import { CopyOutlined, DeleteOutlined, FormOutlined } from '@ant-design/icons-vue'
 import type { Project, Task, TaskFormInput, TaskPriority } from '../../types/todo'
 
 const props = defineProps<{
@@ -21,6 +22,7 @@ const emit = defineEmits<{
   deleteTask: [taskId: string]
   updateTask: [payload: { taskId: string; input: TaskFormInput }]
   addSubtask: [payload: { taskId: string; text: string; plannedAt: string }]
+  updateSubtaskText: [payload: { taskId: string; subtaskId: string; text: string }]
   updateSubtaskPlannedAt: [payload: { taskId: string; subtaskId: string; plannedAt: string }]
   toggleSubtaskCompleted: [payload: { taskId: string; subtaskId: string }]
   deleteSubtask: [payload: { taskId: string; subtaskId: string }]
@@ -32,6 +34,8 @@ const dragTaskId = ref<string | null>(null)
 const dragOverTaskId = ref<string | null>(null)
 const subtaskDrafts = reactive<Record<string, string>>({})
 const subtaskPlanDrafts = reactive<Record<string, string>>({})
+const subtaskTextDrafts = reactive<Record<string, string>>({})
+const editingSubtaskTextKey = ref<string | null>(null)
 const editingSubtaskPlanKey = ref<string | null>(null)
 const subtaskPlanEditorRefs = reactive<Record<string, HTMLElement | null>>({})
 const taskItemRefs = ref<Array<HTMLElement | null>>([])
@@ -161,6 +165,52 @@ function setSubtaskPlanDraft(taskId: string, subtaskId: string, value: string) {
   subtaskPlanDrafts[key] = value
 }
 
+function getSubtaskTextDraft(taskId: string, subtaskId: string, text: string): string {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  if (subtaskTextDrafts[key] === undefined) {
+    subtaskTextDrafts[key] = text
+  }
+  return subtaskTextDrafts[key] ?? ''
+}
+
+function handleSubtaskTextDraftChange(taskId: string, subtaskId: string, value: string) {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  subtaskTextDrafts[key] = value
+}
+
+function beginEditSubtaskText(taskId: string, subtaskId: string, text: string) {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  subtaskTextDrafts[key] = text
+  editingSubtaskTextKey.value = key
+}
+
+function cancelEditSubtaskText() {
+  const key = editingSubtaskTextKey.value
+  if (!key) {
+    return
+  }
+
+  delete subtaskTextDrafts[key]
+  editingSubtaskTextKey.value = null
+}
+
+function handleUpdateSubtaskText(taskId: string, subtaskId: string) {
+  const key = subtaskPlanKey(taskId, subtaskId)
+  const text = (subtaskTextDrafts[key] ?? '').trim()
+  if (!text) {
+    message.warning('子任务内容不能为空')
+    return
+  }
+
+  emit('updateSubtaskText', {
+    taskId,
+    subtaskId,
+    text,
+  })
+  delete subtaskTextDrafts[key]
+  editingSubtaskTextKey.value = null
+}
+
 function handleSubtaskPlanDraftChange(taskId: string, subtaskId: string, value: string) {
   setSubtaskPlanDraft(taskId, subtaskId, value)
 }
@@ -223,7 +273,11 @@ function resetDragState() {
 
 function handleDragStart(taskId: string, event: DragEvent) {
   const target = event.target as HTMLElement | null
-  if (target?.closest('input,button,textarea,select,label,.ant-checkbox,.ant-checkbox-wrapper')) {
+  if (
+    target?.closest(
+      'input,button,textarea,select,a,label,.ant-checkbox,.ant-checkbox-wrapper,.ant-input,.ant-input-affix-wrapper,.ant-input-group-wrapper,.subtask-plan-editor,.subtask-text-editor',
+    )
+  ) {
     event.preventDefault()
     return
   }
@@ -321,6 +375,45 @@ function formatPlannedDate(iso: string | null): string {
   }).format(date)
 }
 
+function fallbackCopyText(text: string): boolean {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', 'true')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  textarea.style.pointerEvents = 'none'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const copied = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  return copied
+}
+
+async function copySubtaskText(text: string) {
+  const content = text.trim()
+  if (!content) {
+    message.warning('子任务名称为空，无法复制')
+    return
+  }
+
+  try {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(content)
+      message.success('已复制子任务名称')
+      return
+    }
+
+    const copied = fallbackCopyText(content)
+    if (!copied) {
+      throw new Error('fallback copy failed')
+    }
+    message.success('已复制子任务名称')
+  }
+  catch {
+    message.error('复制失败，请手动复制')
+  }
+}
+
 onMounted(() => {
   document.addEventListener('mousedown', handlePagePointerDown)
 })
@@ -343,6 +436,8 @@ onBeforeUnmount(() => {
       <article
         v-for="(task, index) in props.tasks"
         :key="task.id"
+        :id="`task-item-${task.id}`"
+        :data-task-id="task.id"
         class="task-item"
         :class="{
           dragging: dragTaskId === task.id,
@@ -351,102 +446,144 @@ onBeforeUnmount(() => {
         }"
         tabindex="0"
         :ref="(el) => setTaskItemRef(index, el)"
-        draggable="true"
-        @dragstart="handleDragStart(task.id, $event)"
-        @dragend="resetDragState"
-        @dragover.prevent="dragOverTaskId = task.id"
-        @dragleave="dragOverTaskId = null"
-        @drop.prevent="handleDrop(task.id)"
         @keydown.space.prevent="handleTaskSpaceToggle(task, $event)"
         @keydown.up="handleTaskArrowNavigation(index, -1, $event)"
         @keydown.down="handleTaskArrowNavigation(index, 1, $event)"
         @keydown.tab="handleTaskTabNavigation(index, $event)"
       >
         <a-card :bordered="false" class="task-card">
-          <div class="task-top">
-            <div class="task-core">
-              <div class="control-group">
-                <a-checkbox
-                  :checked="props.selectedTaskIds.includes(task.id)"
-                  @mousedown.stop
-                  @click.stop
-                  @change="handleTaskSelectedChange(task.id)"
-                />
-                <span class="control-label">选择</span>
+          <div
+            class="task-drag-zone"
+            draggable="true"
+            @dragstart="handleDragStart(task.id, $event)"
+            @dragend="resetDragState"
+            @dragover.prevent="dragOverTaskId = task.id"
+            @dragleave="dragOverTaskId = null"
+            @drop.prevent="handleDrop(task.id)"
+          >
+            <div class="task-top">
+              <div class="task-core">
+                <div class="control-group">
+                  <a-checkbox
+                    :checked="props.selectedTaskIds.includes(task.id)"
+                    @mousedown.stop
+                    @click.stop
+                    @change="handleTaskSelectedChange(task.id)"
+                  />
+                  <span class="control-label">选择</span>
+                </div>
+                <div class="control-group">
+                  <a-checkbox
+                    :checked="task.completed"
+                    @mousedown.stop
+                    @click.stop
+                    @change="handleTaskCompletedChange(task)"
+                  />
+                  <span class="control-label action-label" @click.stop="confirmToggleTaskCompleted(task)">
+                    完成
+                  </span>
+                </div>
+                <h3>{{ task.title }}</h3>
               </div>
-              <div class="control-group">
-                <a-checkbox
-                  :checked="task.completed"
-                  @mousedown.stop
-                  @click.stop
-                  @change="handleTaskCompletedChange(task)"
-                />
-                <span class="control-label action-label" @click.stop="confirmToggleTaskCompleted(task)">
-                  完成
-                </span>
-              </div>
-              <h3>{{ task.title }}</h3>
+
+              <a-space>
+                <a-button size="small" type="primary" class="edit-action-btn" @click="beginEdit(task)">编辑</a-button>
+                <a-button
+                  size="small"
+                  type="primary"
+                  danger
+                  class="delete-action-btn"
+                  @click="emit('deleteTask', task.id)"
+                >
+                  删除
+                </a-button>
+              </a-space>
             </div>
 
-            <a-space>
-              <a-button size="small" type="primary" class="edit-action-btn" @click="beginEdit(task)">编辑</a-button>
-              <a-button
-                size="small"
-                type="primary"
-                danger
-                class="delete-action-btn"
-                @click="emit('deleteTask', task.id)"
-              >
-                删除
-              </a-button>
-            </a-space>
+            <div class="meta-row">
+              <a-tag :color="task.priority === 'high' ? 'red' : task.priority === 'medium' ? 'gold' : 'green'">
+                优先级：{{ priorityLabel(task.priority) }}
+              </a-tag>
+              <a-tag color="purple">{{ props.projectNameById.get(task.projectId) || '未知清单' }}</a-tag>
+              <a-tag :color="dueTagColor(task)">
+                截止：{{ props.formatDueDate(task.dueDate) }}
+                <template v-if="props.dueHint(task)"> · {{ props.dueHint(task) }}</template>
+              </a-tag>
+              <a-tag :color="task.completed ? 'success' : 'processing'">
+                {{ task.completed ? '已完成' : '未完成' }}
+              </a-tag>
+            </div>
+
+            <p v-if="task.description" class="desc">{{ task.description }}</p>
+
+            <div v-if="editingTaskId === task.id" class="edit-grid">
+              <a-input v-model:value="editForm.title" />
+              <a-textarea v-model:value="editForm.description" :rows="2" />
+              <a-input v-model:value="editForm.dueDate" type="datetime-local" />
+              <a-select v-model:value="editForm.priority" :options="priorityOptions" />
+              <a-select v-model:value="editForm.projectId" :options="projectOptions" />
+              <a-space>
+                <a-button type="primary" @click="saveEdit(task.id)">保存</a-button>
+                <a-button @click="cancelEdit">取消</a-button>
+              </a-space>
+            </div>
+
+            <a-divider />
           </div>
-
-          <div class="meta-row">
-            <a-tag :color="task.priority === 'high' ? 'red' : task.priority === 'medium' ? 'gold' : 'green'">
-              优先级：{{ priorityLabel(task.priority) }}
-            </a-tag>
-            <a-tag color="purple">{{ props.projectNameById.get(task.projectId) || '未知清单' }}</a-tag>
-            <a-tag :color="dueTagColor(task)">
-              截止：{{ props.formatDueDate(task.dueDate) }}
-              <template v-if="props.dueHint(task)"> · {{ props.dueHint(task) }}</template>
-            </a-tag>
-            <a-tag :color="task.completed ? 'success' : 'processing'">
-              {{ task.completed ? '已完成' : '未完成' }}
-            </a-tag>
-          </div>
-
-          <p v-if="task.description" class="desc">{{ task.description }}</p>
-
-          <div v-if="editingTaskId === task.id" class="edit-grid">
-            <a-input v-model:value="editForm.title" />
-            <a-textarea v-model:value="editForm.description" :rows="2" />
-            <a-input v-model:value="editForm.dueDate" type="datetime-local" />
-            <a-select v-model:value="editForm.priority" :options="priorityOptions" />
-            <a-select v-model:value="editForm.projectId" :options="projectOptions" />
-            <a-space>
-              <a-button type="primary" @click="saveEdit(task.id)">保存</a-button>
-              <a-button @click="cancelEdit">取消</a-button>
-            </a-space>
-          </div>
-
-          <a-divider />
 
           <div class="subtasks-wrap">
             <h4>子任务（{{ task.subtasks.filter((item) => item.completed).length }}/{{ task.subtasks.length }}）</h4>
 
             <div v-if="task.subtasks.length > 0" class="subtask-list">
-              <div v-for="subtask in task.subtasks" :key="subtask.id" class="subtask-item">
+              <div
+                v-for="subtask in task.subtasks"
+                :key="subtask.id"
+                :id="`subtask-item-${task.id}-${subtask.id}`"
+                :data-task-id="task.id"
+                :data-subtask-id="subtask.id"
+                class="subtask-item"
+              >
                 <div class="subtask-main">
-                  <label>
-                    <a-checkbox
-                      :checked="subtask.completed"
-                      @change="emit('toggleSubtaskCompleted', { taskId: task.id, subtaskId: subtask.id })"
-                    />
-                    <span :class="{ checked: subtask.completed }">
-                      {{ subtask.text }}
-                    </span>
-                  </label>
+                  <div class="subtask-title-row">
+                    <template v-if="editingSubtaskTextKey === subtaskPlanKey(task.id, subtask.id)">
+                      <a-checkbox
+                        :checked="subtask.completed"
+                        @change="emit('toggleSubtaskCompleted', { taskId: task.id, subtaskId: subtask.id })"
+                      />
+                      <a-input
+                        :value="getSubtaskTextDraft(task.id, subtask.id, subtask.text)"
+                        size="small"
+                        class="subtask-text-editor"
+                        placeholder="子任务名称"
+                        @update:value="handleSubtaskTextDraftChange(task.id, subtask.id, $event)"
+                        @press-enter="handleUpdateSubtaskText(task.id, subtask.id)"
+                        @keydown.esc.prevent="cancelEditSubtaskText"
+                      />
+                      <a-button size="small" type="link" @click="handleUpdateSubtaskText(task.id, subtask.id)">
+                        保存
+                      </a-button>
+                      <a-button size="small" type="link" @click="cancelEditSubtaskText">取消</a-button>
+                    </template>
+                    <template v-else>
+                      <a-checkbox
+                        :checked="subtask.completed"
+                        @change="emit('toggleSubtaskCompleted', { taskId: task.id, subtaskId: subtask.id })"
+                      />
+                      <span class="subtask-text-with-copy">
+                        <span :class="{ checked: subtask.completed }">
+                          {{ subtask.text }}
+                        </span>
+                        <a-button
+                          size="small"
+                          type="text"
+                          class="copy-subtask-btn"
+                          @click.stop="copySubtaskText(subtask.text)"
+                        >
+                          <CopyOutlined />
+                        </a-button>
+                      </span>
+                    </template>
+                  </div>
                   <div class="subtask-plan-row">
                     <small class="planned-time">预计：{{ formatPlannedDate(subtask.plannedAt) }}</small>
 
@@ -477,15 +614,25 @@ onBeforeUnmount(() => {
                     </a-button>
                   </div>
                 </div>
-                <a-button
-                  size="small"
-                  type="primary"
-                  danger
-                  class="delete-action-btn"
-                  @click="emit('deleteSubtask', { taskId: task.id, subtaskId: subtask.id })"
-                >
-                  删除
-                </a-button>
+                <div class="subtask-actions">
+                  <a-button
+                    size="small"
+                    type="text"
+                    class="subtask-action-btn"
+                    @click="beginEditSubtaskText(task.id, subtask.id, subtask.text)"
+                  >
+                    <FormOutlined />
+                  </a-button>
+                  <a-button
+                    size="small"
+                    type="text"
+                    danger
+                    class="subtask-action-btn"
+                    @click="emit('deleteSubtask', { taskId: task.id, subtaskId: subtask.id })"
+                  >
+                    <DeleteOutlined />
+                  </a-button>
+                </div>
               </div>
             </div>
 
@@ -653,6 +800,51 @@ h2 {
 .subtask-main {
   display: grid;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.subtask-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.subtask-text-with-copy {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.copy-subtask-btn {
+  display: inline-flex;
+  vertical-align: baseline;
+  margin-left: 4px;
+  padding-inline: 4px;
+}
+
+.copy-subtask-btn :deep(svg) {
+  transform: rotate(180deg);
+}
+
+.subtask-text-editor {
+  width: min(100%, 640px);
+  min-width: 280px;
+  max-width: 640px;
+  flex: 1 1 420px;
+}
+
+.subtask-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.subtask-action-btn {
+  padding-inline: 4px;
 }
 
 .subtask-plan-row {

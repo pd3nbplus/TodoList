@@ -9,6 +9,21 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
 
 ## 版本说明 Version Notes
 
+### V1.0.3 (2026-03-02)
+
+- 任务时序图支持右键跳转：首页可按任务或子任务定位并自动滚动高亮。  
+  Timeline now supports right-click navigation to Home, with auto-scroll and highlight targeting by task or subtask.
+- 修复任务拖拽交互：拖拽触发区限制在 `task-drag-zone`，上下方向交换行为一致。  
+  Fixed task drag interaction: drag trigger area is limited to `task-drag-zone`, with consistent up/down swap behavior.
+- 子任务操作升级：新增图标化编辑/删除按钮；支持仅编辑子任务文本。  
+  Upgraded subtask actions with icon-based edit/delete buttons and text-only editing support.
+- 子任务文本复制体验优化：复制图标内联跟随文本末尾显示，并调整图标方向。  
+  Improved subtask copy UX: inline copy icon follows text end and icon direction is adjusted.
+- 首页数据看板增强：清单分布支持动态新增清单展示，并为每个清单提供任务进度 + 子任务进度双进度条。  
+  Enhanced Home insights: dynamically includes newly added lists and provides dual progress bars (task + subtask) per list.
+- 时序图子任务文本展示优化：超过 10 个字符自动截断并使用省略号显示。  
+  Improved timeline subtask text rendering: texts longer than 10 characters are truncated with ellipsis.
+
 ### V1.0.2 (2026-03-02)
 
 - 新增首页数据看板：任务完成率趋势（日/周/月）、平均任务周期、项目分布与完成情况、拖延指数。  

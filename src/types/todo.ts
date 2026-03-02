@@ -73,6 +73,9 @@ export interface ProjectProgressItem {
   completed: number
   completionRate: number
   overdue: number
+  totalSubtasks: number
+  completedSubtasks: number
+  subtaskCompletionRate: number
 }
 
 export interface DelayMetrics {

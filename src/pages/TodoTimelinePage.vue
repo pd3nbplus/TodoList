@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import type { Subtask, Task } from '../types/todo'
 import { useTodoList } from '../composables/useTodoList'
 
@@ -11,6 +12,7 @@ const PARENT_Y = 26
 const SUBTASK_START_Y = 88
 const SUBTASK_GAP = 46
 const GROUP_GAP = 18
+const SUBTASK_TEXT_MAX_LENGTH = 10
 const PRIORITY_ORDER: Record<Task['priority'], number> = {
   high: 3,
   medium: 2,
@@ -32,6 +34,7 @@ const {
 const timelineScrollRef = ref<HTMLElement | null>(null)
 const timelineCanvasRef = ref<HTMLElement | null>(null)
 const viewportHeight = ref(420)
+const router = useRouter()
 
 let resizeObserver: ResizeObserver | null = null
 
@@ -258,6 +261,15 @@ function formatShortDate(iso: string | null): string {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(date)
 }
 
+function formatSubtaskNodeText(text: string): string {
+  const chars = Array.from(text.trim())
+  if (chars.length <= SUBTASK_TEXT_MAX_LENGTH) {
+    return chars.join('')
+  }
+
+  return `${chars.slice(0, SUBTASK_TEXT_MAX_LENGTH).join('')}...`
+}
+
 function updateViewportHeight() {
   if (!timelineScrollRef.value) {
     return
@@ -359,6 +371,10 @@ function onSubtaskPointerUp() {
 }
 
 function beginSubtaskDrag(task: Task, subtask: Subtask, event: PointerEvent) {
+  if (event.button !== 0) {
+    return
+  }
+
   if (subtask.completed) {
     return
   }
@@ -371,6 +387,13 @@ function beginSubtaskDrag(task: Task, subtask: Subtask, event: PointerEvent) {
 
   window.addEventListener('pointermove', onSubtaskPointerMove)
   window.addEventListener('pointerup', onSubtaskPointerUp)
+}
+
+function jumpToHomeByTask(taskId: string, subtaskId?: string) {
+  const query = subtaskId
+    ? { taskId, subtaskId }
+    : { taskId }
+  void router.push({ name: 'home', query })
 }
 
 onMounted(async () => {
@@ -473,6 +496,7 @@ onBeforeUnmount(() => {
               class="parent-node"
               :class="{ done: group.task.completed }"
               :style="{ left: `${xFromIso(group.task.createdAt)}px` }"
+              @contextmenu.prevent="jumpToHomeByTask(group.task.id)"
             >
               <strong>{{ group.task.title }}</strong>
               <small>
@@ -495,9 +519,10 @@ onBeforeUnmount(() => {
                 left: `${getSubtaskTimelineX(group.task, subtask)}px`,
                 top: `${subtaskTop(idx)}px`,
               }"
+              @contextmenu.prevent="jumpToHomeByTask(group.task.id, subtask.id)"
               @pointerdown="beginSubtaskDrag(group.task, subtask, $event)"
             >
-              <span>{{ subtask.text }}</span>
+              <span :title="subtask.text">{{ formatSubtaskNodeText(subtask.text) }}</span>
               <small>
                 {{ subtask.completed ? '完成于' : '预计' }}
                 {{ formatShortDate(getSubtaskTimelineIso(group.task, subtask)) }}
