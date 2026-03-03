@@ -56,8 +56,8 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
       <a-typography-text type="secondary">任务效率与分布概览</a-typography-text>
     </div>
 
-    <a-row :gutter="[12, 12]">
-      <a-col :xs="24" :md="11">
+    <a-row :gutter="[12, 12]" class="overview-row">
+      <a-col :xs="24" :md="24" class="overview-col">
         <a-card size="small" class="inner-card" title="任务完成率趋势（日 / 周 / 月）">
           <div class="trend-list">
             <div v-for="item in props.insights.completionTrend" :key="item.label" class="trend-item">
@@ -75,14 +75,14 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
         </a-card>
       </a-col>
 
-      <a-col :xs="24" :md="13">
-        <a-card size="small" class="inner-card">
-          <a-row :gutter="[12, 12]">
-            <a-col :xs="24" :sm="12">
+      <a-col :xs="24" :md="24" class="overview-col">
+        <a-card size="small" class="inner-card metrics-card">
+          <div class="metrics-grid">
+            <div class="metric-item">
               <a-statistic title="平均任务周期（天）" :value="averageCycleText" />
               <a-typography-text type="secondary">样本：{{ props.insights.completedTaskCount }}</a-typography-text>
-            </a-col>
-            <a-col :xs="24" :sm="12">
+            </div>
+            <div class="metric-item">
               <a-statistic
                 title="拖延指数（%）"
                 :value="props.insights.delay.index === null ? '--' : Number(props.insights.delay.index.toFixed(1))"
@@ -97,8 +97,8 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
               <a-typography-text type="secondary">
                 平均偏差：{{ averageDeviationText }}（样本 {{ props.insights.delay.sampleCount }}）
               </a-typography-text>
-            </a-col>
-          </a-row>
+            </div>
+          </div>
         </a-card>
       </a-col>
     </a-row>
@@ -147,6 +147,26 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
 .inner-card {
   border-radius: 12px;
   background: #ffffff;
+}
+
+.overview-col + .overview-col {
+  margin-top: 2px;
+}
+
+.metrics-card {
+  border: 1px solid rgba(155, 89, 182, 0.12);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.06), rgba(255, 255, 255, 0.9));
 }
 
 .trend-list {
@@ -198,6 +218,12 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
   color: #7a6c86;
 }
 
+@media (max-width: 640px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 :deep(.app-layout.dark-mode .insight-card) {
   background: #1a2331 !important;
   border: 1px solid #2a3445;
@@ -210,6 +236,14 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
 :deep(.app-layout.dark-mode .insight-card .inner-card) {
   background: #141d29 !important;
   border: 1px solid #2a3445;
+}
+
+:deep(.app-layout.dark-mode .insight-card .metrics-card) {
+  border-color: #3a4861 !important;
+}
+
+:deep(.app-layout.dark-mode .insight-card .metric-item) {
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.18), rgba(26, 35, 49, 0.88)) !important;
 }
 
 :deep(.app-layout.dark-mode .insight-card .inner-card > .ant-card-body),

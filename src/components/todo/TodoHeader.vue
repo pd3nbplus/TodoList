@@ -47,8 +47,18 @@ const props = defineProps<{
 
 <style scoped>
 .todo-header {
+  margin-top: 80px;
   border-radius: 18px;
-  background: linear-gradient(135deg, rgba(155, 89, 182, 0.12), rgba(255, 255, 255, 0.95));
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(155, 89, 182, 0.12) 0px,
+      rgba(155, 89, 182, 0.12) 10px,
+      rgba(255, 255, 255, 0.05) 10px,
+      rgba(255, 255, 255, 0.05) 22px
+    ),
+    linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(255, 255, 255, 0.95));
+  border: 1px solid rgba(155, 89, 182, 0.18);
 }
 
 .eyebrow {

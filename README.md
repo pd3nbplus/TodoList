@@ -9,6 +9,15 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
 
 ## 版本说明 Version Notes
 
+### V1.0.4 (2026-03-03)
+
+- 新增任务添加区折叠交互优化：折叠时在“添加任务”右侧显示提示文案，展开后文案自动隐藏，图标在 `+ / -` 间切换。  
+  Improved task composer collapse behavior: hint text shows beside “Add Task” when collapsed, hides on expand, and icon toggles between `+ / -`.
+- 时序图底部时间轴默认长度改为按可视宽度自适应填充，默认尽量铺满且避免出现横向滚动条。  
+  Timeline footer axis now auto-fits viewport width by default, maximizing fill while avoiding horizontal scrollbar in default state.
+- 深色模式样式补强，并将时序图父任务/子任务节点颜色在深浅模式下统一为浅色方案，保证状态识别一致性。  
+  Enhanced dark-mode styling and unified timeline parent/subtask node colors across light/dark themes using the light palette for consistent status recognition.
+
 ### V1.0.3 (2026-03-02)
 
 - 任务时序图支持右键跳转：首页可按任务或子任务定位并自动滚动高亮。  

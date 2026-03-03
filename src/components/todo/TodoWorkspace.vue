@@ -215,20 +215,20 @@ onBeforeUnmount(() => {
     <div class="glow glow-right"></div>
 
     <div class="workspace">
-      <TodoHeader :stats="stats" />
-      <TodoInsights :insights="insights" />
-
       <div class="content-grid">
-        <ProjectSidebar
-          :projects="projects"
-          :selected-project-id="filters.projectId"
-          :default-project-id="defaultProjectId"
-          :notification-permission="notificationPermission"
-          @add-project="handleAddProject"
-          @select-project="(projectId) => (filters.projectId = projectId)"
-          @remove-project="removeProject"
-          @request-notification="requestNotificationAccess"
-        />
+        <div class="left-rail">
+          <TodoHeader :stats="stats" />
+          <ProjectSidebar
+            :projects="projects"
+            :selected-project-id="filters.projectId"
+            :default-project-id="defaultProjectId"
+            :notification-permission="notificationPermission"
+            @add-project="handleAddProject"
+            @select-project="(projectId) => (filters.projectId = projectId)"
+            @remove-project="removeProject"
+            @request-notification="requestNotificationAccess"
+          />
+        </div>
 
         <div class="main-stack">
           <TaskComposer
@@ -266,6 +266,10 @@ onBeforeUnmount(() => {
             @delete-subtask="({ taskId, subtaskId }) => deleteSubtask(taskId, subtaskId)"
             @reorder-tasks="({ draggedTaskId, targetTaskId }) => reorderTasks(draggedTaskId, targetTaskId)"
           />
+        </div>
+
+        <div class="right-rail">
+          <TodoInsights :insights="insights" />
         </div>
       </div>
     </div>
@@ -325,26 +329,59 @@ onBeforeUnmount(() => {
 }
 
 .workspace {
-  max-width: 1280px;
+  width: 85%;
+  max-width: 1680px;
   margin: 0 auto;
   position: relative;
   z-index: 1;
-  display: grid;
-  gap: 12px;
 }
 
 .content-grid {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: minmax(240px, 23fr) minmax(0, 54fr) minmax(240px, 23fr);
+  align-items: start;
   gap: 12px;
+}
+
+.left-rail {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.right-rail {
+  display: grid;
+  align-content: start;
+  min-width: 0;
 }
 
 .main-stack {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1400px) {
+  .workspace {
+    width: 90%;
+  }
+}
+
+@media (max-width: 1200px) {
+  .content-grid {
+    grid-template-columns: minmax(220px, 35fr) minmax(0, 65fr);
+  }
+
+  .right-rail {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    width: 100%;
+  }
+
   .content-grid {
     grid-template-columns: 1fr;
   }

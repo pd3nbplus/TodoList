@@ -34,6 +34,7 @@ const {
 const timelineScrollRef = ref<HTMLElement | null>(null)
 const timelineCanvasRef = ref<HTMLElement | null>(null)
 const viewportHeight = ref(420)
+const viewportWidth = ref(960)
 const router = useRouter()
 
 let resizeObserver: ResizeObserver | null = null
@@ -103,7 +104,9 @@ const timeBoundary = computed(() => {
 const timelineInfo = computed(() => {
   const startMs = timeBoundary.value.startMs
   const endMs = timeBoundary.value.endMs
-  const totalDays = Math.max(8, Math.floor((endMs - startMs) / DAY_MS) + 1)
+  const rangeDays = Math.floor((endMs - startMs) / DAY_MS) + 1
+  const minDaysByViewport = Math.max(1, Math.floor(viewportWidth.value / PX_PER_DAY))
+  const totalDays = Math.max(minDaysByViewport, rangeDays)
   const width = totalDays * PX_PER_DAY
 
   const days = Array.from({ length: totalDays }, (_, index) => {
@@ -270,12 +273,13 @@ function formatSubtaskNodeText(text: string): string {
   return `${chars.slice(0, SUBTASK_TEXT_MAX_LENGTH).join('')}...`
 }
 
-function updateViewportHeight() {
+function updateViewportSize() {
   if (!timelineScrollRef.value) {
     return
   }
 
   viewportHeight.value = timelineScrollRef.value.clientHeight
+  viewportWidth.value = timelineScrollRef.value.clientWidth
 }
 
 function alignNowToOneThird() {
@@ -398,12 +402,12 @@ function jumpToHomeByTask(taskId: string, subtaskId?: string) {
 
 onMounted(async () => {
   await nextTick()
-  updateViewportHeight()
+  updateViewportSize()
   alignNowToOneThird()
 
   if (typeof ResizeObserver !== 'undefined' && timelineScrollRef.value) {
     resizeObserver = new ResizeObserver(() => {
-      updateViewportHeight()
+      updateViewportSize()
     })
     resizeObserver.observe(timelineScrollRef.value)
   }
@@ -715,9 +719,9 @@ onBeforeUnmount(() => {
 }
 
 .subtask-node.done {
-  background: #f6ffed;
-  border: 1px solid #95de64;
-  color: #237804;
+  background: #f8fff2;
+  border: 1px solid #b7eb8f;
+  color: #389e0d;
   cursor: default;
 }
 

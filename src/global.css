@@ -107,3 +107,16 @@ html.app-dark .roadmap-page .due-axis span {
   background: #3a2023 !important;
   color: #ffb3b5 !important;
 }
+
+html.app-dark .roadmap-page .summary-head h1,
+html.app-dark .roadmap-page .summary-head p {
+  color: #dce5f0 !important;
+}
+
+html.app-dark .composer-inline-hint {
+  color: #aebcd0 !important;
+}
+
+html.app-dark .composer-toggle-btn {
+  color: #c9a7f3 !important;
+}

@@ -90,7 +90,7 @@ watch(darkMode, (value) => {
           <div class="dot"></div>
           <div class="text">
             <strong>TodoList</strong>
-            <small>V1.0.2</small>
+            <small>V1.0.4</small>
           </div>
         </div>
 
