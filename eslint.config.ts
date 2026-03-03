@@ -21,6 +21,20 @@ export default defineConfigWithVueTs(
 
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
+  {
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        {
+          allowExpressions: true,
+          allowTypedFunctionExpressions: true,
+        },
+      ],
+      '@typescript-eslint/no-explicit-any': 'error',
+      'vue/component-api-style': ['error', ['script-setup', 'composition']],
+      'vue/require-explicit-emits': 'error',
+    },
+  },
 
   {
     ...pluginPlaywright.configs['flat/recommended'],

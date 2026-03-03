@@ -58,6 +58,17 @@ export interface TodoPersistedState {
   projects: Project[]
 }
 
+export interface TodoStats {
+  total: number
+  active: number
+  completed: number
+  overdue: number
+  totalSubtasks: number
+  activeSubtasks: number
+  completedSubtasks: number
+  subtaskCompletionRate: number
+}
+
 export interface CompletionTrendPoint {
   label: '日' | '周' | '月'
   windowDays: number

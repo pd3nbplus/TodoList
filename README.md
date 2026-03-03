@@ -9,6 +9,17 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
 
 ## 版本说明 Version Notes
 
+### V1.0.5 (2026-03-04)
+
+- 落地大列表性能优化：任务数量超过 50 条时自动启用虚拟滚动，并保持拖拽、编辑、子任务交互一致。  
+  Delivered large-list optimization: virtual scrolling is automatically enabled when task count exceeds 50 while preserving drag/edit/subtask interactions.
+- 增加虚拟滚动回归用例：新增 Playwright 场景，覆盖“自动启用虚拟滚动”与“虚拟列表下键盘导航”验证。  
+  Added regression coverage for virtual scrolling: new Playwright scenarios validate auto-enable behavior and keyboard navigation in virtualized lists.
+- 按《前端开发指南》收敛工程规范：补齐 ESLint 强约束（显式返回类型、显式 emits、组件 API 风格），并增加 Vite CSS 处理与分包配置。  
+  Aligned engineering standards with the Frontend Development Guide by enforcing stricter ESLint rules (explicit return types/emits, component API style) and adding Vite CSS processing plus chunk splitting.
+- 继续沿用自定义 `localStorage` 持久化，同时新增存储封装层与版本迁移分支，提升可维护性。  
+  Continued using the custom `localStorage` persistence approach with a new storage abstraction layer and version migration branch for better maintainability.
+
 ### V1.0.4 (2026-03-03)
 
 - 新增任务添加区折叠交互优化：折叠时在“添加任务”右侧显示提示文案，展开后文案自动隐藏，图标在 `+ / -` 间切换。  
@@ -84,6 +95,8 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
   Project-based task grouping
 - 搜索、筛选、排序（状态 / 优先级 / 截止日期 / 手动拖拽）  
   Search, filter, and sort (status / priority / due date / manual drag)
+- 大列表性能优化：任务数超过 50 条时自动启用虚拟滚动  
+  Large-list optimization: virtual scrolling is automatically enabled when tasks exceed 50
 - 本地持久化（localStorage）  
   Local persistence via localStorage
 - 撤销操作（Undo Snackbar）  
@@ -100,29 +113,48 @@ A componentized TodoList web app built with Vue 3 + Vite + TypeScript + Ant Desi
 - Vitest
 - Playwright
 
+## 开发规范 Development Guide
+
+- 项目开发规范已纳入仓库根目录，与 `README.md` 同级：`./前端开发指南.md`
+- 日常开发、重构与 Code Review 请按该文档执行。
+
 ## 目录结构 Project Structure
 
 ```text
 src/
-  pages/
-    HomePage.vue
-    TodoTimelinePage.vue
-  router/
-    index.ts
+  assets/
+    styles/
+      global.css
   components/todo/
-    TodoWorkspace.vue
-    TodoHeader.vue
     ProjectSidebar.vue
-    TaskComposer.vue
-    TaskToolbar.vue
     TaskBulkActions.vue
+    TaskComposer.vue
     TaskList.vue
+    TaskMetaTags.tsx
+    TaskToolbar.vue
+    TodoHeader.vue
+    TodoInsights.vue
+    TodoWorkspace.vue
     UndoBar.vue
   composables/
+    useTaskListModel.ts
     useTodoList.ts
+    useTodoTimeline.ts
+    useTodoWorkspace.ts
+  layouts/
+    DefaultLayout.vue
+  router/
+    index.ts
+    routes.ts
+  stores/
+    todo.ts
   types/
     todo.ts
+  views/
+    HomeView.vue
+    TodoTimelineView.vue
   App.vue
+  main.ts
 ```
 
 ## 安装与运行 Setup

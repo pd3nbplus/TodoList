@@ -3,10 +3,13 @@ import { nextTick, reactive, ref } from 'vue'
 import { MinusCircleOutlined, PlusCircleOutlined } from '@ant-design/icons-vue'
 import type { Project, TaskFormInput, TaskPriority } from '../../types/todo'
 
-const props = defineProps<{
-  projects: Project[]
-  defaultProjectId: string
-}>()
+const props = withDefaults(defineProps<{
+  projects?: Project[]
+  defaultProjectId?: string
+}>(), {
+  projects: () => [],
+  defaultProjectId: 'inbox',
+})
 
 const emit = defineEmits<{
   createTask: [payload: TaskFormInput]
@@ -28,7 +31,7 @@ const form = reactive<TaskFormInput>({
 const expanded = ref(false)
 const titleInputRef = ref()
 
-function toggleComposer() {
+function toggleComposer(): void {
   expanded.value = !expanded.value
   if (expanded.value) {
     void nextTick(() => {
@@ -37,7 +40,7 @@ function toggleComposer() {
   }
 }
 
-function submitTask() {
+function submitTask(): void {
   if (!form.title.trim()) {
     return
   }

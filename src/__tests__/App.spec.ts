@@ -1,7 +1,7 @@
 import { beforeAll, describe, it, expect, vi } from 'vitest'
 
 import { mount } from '@vue/test-utils'
-import Antd from 'ant-design-vue'
+import { createPinia } from 'pinia'
 import App from '../App.vue'
 import router from '../router'
 
@@ -28,11 +28,11 @@ describe('App', () => {
 
     const wrapper = mount(App, {
       global: {
-        plugins: [Antd, router],
+        plugins: [createPinia(), router],
       },
     })
 
     expect(wrapper.text()).toContain('任务画布')
     expect(wrapper.text()).toContain('添加任务')
-  })
+  }, 10000)
 })

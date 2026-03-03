@@ -1,7 +1,9 @@
 <script setup lang="ts">
-const props = defineProps<{
-  selectedCount: number
-}>()
+const props = withDefaults(defineProps<{
+  selectedCount?: number
+}>(), {
+  selectedCount: 0,
+})
 
 const emit = defineEmits<{
   deleteSelected: []

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-const props = defineProps<{
-  message: string | null
-}>()
+const props = withDefaults(defineProps<{
+  message?: string | null
+}>(), {
+  message: null,
+})
 
 const emit = defineEmits<{
   undo: []

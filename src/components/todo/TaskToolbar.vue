@@ -1,36 +1,63 @@
 <script setup lang="ts">
+import type { SelectValue } from 'ant-design-vue/es/select'
 import type { FilterState } from '../../types/todo'
 
-const props = defineProps<{
-  filters: FilterState
-}>()
+const props = withDefaults(defineProps<{
+  filters?: FilterState
+}>(), {
+  filters: () => ({
+    search: '',
+    status: 'all',
+    priority: 'all',
+    projectId: 'all',
+    due: 'all',
+    sortBy: 'created_desc',
+  }),
+})
 
 const emit = defineEmits<{
   updateFilters: [patch: Partial<FilterState>]
 }>()
 
-function setFilter<K extends keyof FilterState>(key: K, value: FilterState[K]) {
+const STATUS_VALUES: FilterState['status'][] = ['all', 'active', 'completed']
+const PRIORITY_VALUES: FilterState['priority'][] = ['all', 'high', 'medium', 'low']
+const DUE_VALUES: FilterState['due'][] = ['all', 'today', 'tomorrow', 'week', 'overdue']
+const SORT_VALUES: FilterState['sortBy'][] = ['created_desc', 'due_asc', 'priority_desc', 'manual']
+
+function setFilter<K extends keyof FilterState>(key: K, value: FilterState[K]): void {
   emit('updateFilters', { [key]: value } as Partial<FilterState>)
 }
 
-function updateSearch(value: string) {
+function updateSearch(value: string): void {
   setFilter('search', value)
 }
 
-function updateStatus(value: FilterState['status']) {
-  setFilter('status', value)
+function updateStatus(value: SelectValue): void {
+  if (typeof value !== 'string' || !STATUS_VALUES.includes(value as FilterState['status'])) {
+    return
+  }
+  setFilter('status', value as FilterState['status'])
 }
 
-function updatePriority(value: FilterState['priority']) {
-  setFilter('priority', value)
+function updatePriority(value: SelectValue): void {
+  if (typeof value !== 'string' || !PRIORITY_VALUES.includes(value as FilterState['priority'])) {
+    return
+  }
+  setFilter('priority', value as FilterState['priority'])
 }
 
-function updateDue(value: FilterState['due']) {
-  setFilter('due', value)
+function updateDue(value: SelectValue): void {
+  if (typeof value !== 'string' || !DUE_VALUES.includes(value as FilterState['due'])) {
+    return
+  }
+  setFilter('due', value as FilterState['due'])
 }
 
-function updateSortBy(value: FilterState['sortBy']) {
-  setFilter('sortBy', value)
+function updateSortBy(value: SelectValue): void {
+  if (typeof value !== 'string' || !SORT_VALUES.includes(value as FilterState['sortBy'])) {
+    return
+  }
+  setFilter('sortBy', value as FilterState['sortBy'])
 }
 </script>
 

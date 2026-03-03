@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   stats: {
     total: number
     active: number
@@ -10,7 +10,18 @@ const props = defineProps<{
     completedSubtasks: number
     subtaskCompletionRate: number
   }
-}>()
+}>(), {
+  stats: () => ({
+    total: 0,
+    active: 0,
+    completed: 0,
+    overdue: 0,
+    totalSubtasks: 0,
+    activeSubtasks: 0,
+    completedSubtasks: 0,
+    subtaskCompletionRate: 0,
+  }),
+})
 </script>
 
 <template>

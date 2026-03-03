@@ -2,9 +2,23 @@
 import { computed } from 'vue'
 import type { TodoInsights } from '../../types/todo'
 
-const props = defineProps<{
-  insights: TodoInsights
-}>()
+const props = withDefaults(defineProps<{
+  insights?: TodoInsights
+}>(), {
+  insights: () => ({
+    completionTrend: [],
+    averageTaskCycleHours: null,
+    averageTaskCycleDays: null,
+    completedTaskCount: 0,
+    projectProgress: [],
+    delay: {
+      index: null,
+      averageDeviationHours: null,
+      delayedRate: null,
+      sampleCount: 0,
+    },
+  }),
+})
 
 const averageCycleText = computed(() => {
   const days = props.insights.averageTaskCycleDays
@@ -225,30 +239,30 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
 }
 
 :deep(.app-layout.dark-mode .insight-card) {
-  background: #1a2331 !important;
+  background: #1a2331;
   border: 1px solid #2a3445;
 }
 
 :deep(.app-layout.dark-mode .insight-card > .ant-card-body) {
-  background: #1a2331 !important;
+  background: #1a2331;
 }
 
 :deep(.app-layout.dark-mode .insight-card .inner-card) {
-  background: #141d29 !important;
+  background: #141d29;
   border: 1px solid #2a3445;
 }
 
 :deep(.app-layout.dark-mode .insight-card .metrics-card) {
-  border-color: #3a4861 !important;
+  border-color: #3a4861;
 }
 
 :deep(.app-layout.dark-mode .insight-card .metric-item) {
-  background: linear-gradient(135deg, rgba(155, 89, 182, 0.18), rgba(26, 35, 49, 0.88)) !important;
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.18), rgba(26, 35, 49, 0.88));
 }
 
 :deep(.app-layout.dark-mode .insight-card .inner-card > .ant-card-body),
 :deep(.app-layout.dark-mode .insight-card .inner-card > .ant-card-head) {
-  background: #141d29 !important;
+  background: #141d29;
 }
 
 :deep(.app-layout.dark-mode .insight-card .inner-card > .ant-card-head) {
@@ -262,6 +276,6 @@ function delayStatus(index: number | null): 'success' | 'normal' | 'exception' {
 :deep(.app-layout.dark-mode .insight-card .ant-statistic-title),
 :deep(.app-layout.dark-mode .insight-card .ant-statistic-content),
 :deep(.app-layout.dark-mode .insight-card .ant-card-head-title) {
-  color: #dce5f0 !important;
+  color: #dce5f0;
 }
 </style>

@@ -19,49 +19,49 @@ html.app-dark #app {
 html.app-dark .app-layout,
 html.app-dark .app-main,
 html.app-dark .app-content {
-  background: #0f1520 !important;
+  background: #0f1520;
 }
 
 html.app-dark .todo-page {
-  background: radial-gradient(circle at top, #1f2532, #151d29 46%, #101722 100%) !important;
+  background: radial-gradient(circle at top, #1f2532, #151d29 46%, #101722 100%);
 }
 
 html.app-dark .todo-page .ant-card {
-  border: 1px solid #2a3445 !important;
-  box-shadow: none !important;
+  border: 1px solid #2a3445;
+  box-shadow: none;
 }
 
 html.app-dark .todo-page .ant-card .ant-card-body {
-  background: #171f2c !important;
-  color: #e7edf7 !important;
+  background: #171f2c;
+  color: #e7edf7;
 }
 
 html.app-dark .todo-page .ant-card .ant-card-head {
-  background: #171f2c !important;
-  border-bottom-color: #2a3445 !important;
+  background: #171f2c;
+  border-bottom-color: #2a3445;
 }
 
 html.app-dark .insight-card {
-  background: #1a2331 !important;
-  border: 1px solid #2a3445 !important;
+  background: #1a2331;
+  border: 1px solid #2a3445;
 }
 
 html.app-dark .insight-card > .ant-card-body {
-  background: #1a2331 !important;
+  background: #1a2331;
 }
 
 html.app-dark .insight-card .inner-card {
-  background: #141d29 !important;
-  border: 1px solid #2a3445 !important;
+  background: #141d29;
+  border: 1px solid #2a3445;
 }
 
 html.app-dark .insight-card .inner-card > .ant-card-body,
 html.app-dark .insight-card .inner-card > .ant-card-head {
-  background: #141d29 !important;
+  background: #141d29;
 }
 
 html.app-dark .insight-card .inner-card > .ant-card-head {
-  border-bottom-color: #2a3445 !important;
+  border-bottom-color: #2a3445;
 }
 
 html.app-dark .insight-card .head h2,
@@ -71,52 +71,52 @@ html.app-dark .insight-card .ant-typography,
 html.app-dark .insight-card .ant-statistic-title,
 html.app-dark .insight-card .ant-statistic-content,
 html.app-dark .insight-card .ant-card-head-title {
-  color: #dce5f0 !important;
+  color: #dce5f0;
 }
 
 html.app-dark .roadmap-page {
-  background: transparent !important;
+  background: transparent;
 }
 
 html.app-dark .roadmap-page .timeline-scroll {
-  background: #111925 !important;
-  border-color: #2a3445 !important;
+  background: #111925;
+  border-color: #2a3445;
 }
 
 html.app-dark .roadmap-page .timeline-canvas,
 html.app-dark .roadmap-page .timeline-body {
-  background: linear-gradient(180deg, #111925 0%, #101823 100%) !important;
+  background: linear-gradient(180deg, #111925 0%, #101823 100%);
 }
 
 html.app-dark .roadmap-page .timeline-footer {
-  background: linear-gradient(180deg, #151f2d, #111925) !important;
-  border-top-color: #2a3445 !important;
+  background: linear-gradient(180deg, #151f2d, #111925);
+  border-top-color: #2a3445;
 }
 
 html.app-dark .roadmap-page .day-cell {
-  border-right-color: rgba(182, 203, 228, 0.16) !important;
-  color: #aebcd0 !important;
+  border-right-color: rgba(182, 203, 228, 0.16);
+  color: #aebcd0;
 }
 
 html.app-dark .roadmap-page .now-line span {
-  background: #2c2140 !important;
-  color: #c9a7f3 !important;
+  background: #2c2140;
+  color: #c9a7f3;
 }
 
 html.app-dark .roadmap-page .due-axis span {
-  background: #3a2023 !important;
-  color: #ffb3b5 !important;
+  background: #3a2023;
+  color: #ffb3b5;
 }
 
 html.app-dark .roadmap-page .summary-head h1,
 html.app-dark .roadmap-page .summary-head p {
-  color: #dce5f0 !important;
+  color: #dce5f0;
 }
 
 html.app-dark .composer-inline-hint {
-  color: #aebcd0 !important;
+  color: #aebcd0;
 }
 
 html.app-dark .composer-toggle-btn {
-  color: #c9a7f3 !important;
+  color: #c9a7f3;
 }

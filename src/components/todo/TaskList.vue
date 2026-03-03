@@ -1,20 +1,39 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import type { ComponentPublicInstance } from 'vue'
-import { Modal, message } from 'ant-design-vue'
+import { computed, ref, watchEffect } from 'vue'
 import { CopyOutlined, DeleteOutlined, FormOutlined } from '@ant-design/icons-vue'
-import type { Project, Task, TaskFormInput, TaskPriority } from '../../types/todo'
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
+import type { Task, TaskFormInput } from '../../types/todo'
+import type { TaskListProps } from '../../composables/useTaskListModel'
+import { useTaskListModel } from '../../composables/useTaskListModel'
+import TaskMetaTags from './TaskMetaTags'
 
-const props = defineProps<{
-  tasks: Task[]
-  projects: Project[]
-  selectedTaskIds: string[]
-  projectNameById: Map<string, string>
-  formatDueDate: (value: string | null) => string
-  dueStatus: (task: Task) => 'none' | 'overdue' | 'today' | 'tomorrow' | 'week'
-  dueHint: (task: Task) => string | null
-  toLocalDateTimeInputValue: (value: string | null) => string
-}>()
+interface TaskListInputProps {
+  tasks?: TaskListProps['tasks']
+  projects?: TaskListProps['projects']
+  selectedTaskIds?: TaskListProps['selectedTaskIds']
+  projectNameById?: TaskListProps['projectNameById']
+  formatDueDate?: TaskListProps['formatDueDate']
+  dueStatus?: TaskListProps['dueStatus']
+  dueHint?: TaskListProps['dueHint']
+  toLocalDateTimeInputValue?: TaskListProps['toLocalDateTimeInputValue']
+}
+
+const props = withDefaults(defineProps<TaskListInputProps>(), {
+  tasks: () => [],
+  projects: () => [],
+  selectedTaskIds: () => [],
+  projectNameById: () => new Map<string, string>(),
+  formatDueDate: (value: string | null) => value ?? '',
+  dueStatus: (task: Task): 'none' => {
+    void task
+    return 'none'
+  },
+  dueHint: (task: Task) => {
+    void task
+    return null
+  },
+  toLocalDateTimeInputValue: () => '',
+})
 
 const emit = defineEmits<{
   toggleTaskSelected: [taskId: string]
@@ -29,397 +48,65 @@ const emit = defineEmits<{
   reorderTasks: [payload: { draggedTaskId: string; targetTaskId: string }]
 }>()
 
-const editingTaskId = ref<string | null>(null)
-const dragTaskId = ref<string | null>(null)
-const dragOverTaskId = ref<string | null>(null)
-const subtaskDrafts = reactive<Record<string, string>>({})
-const subtaskPlanDrafts = reactive<Record<string, string>>({})
-const subtaskTextDrafts = reactive<Record<string, string>>({})
-const editingSubtaskTextKey = ref<string | null>(null)
-const editingSubtaskPlanKey = ref<string | null>(null)
-const subtaskPlanEditorRefs = reactive<Record<string, HTMLElement | null>>({})
-const taskItemRefs = ref<Array<HTMLElement | null>>([])
-
-const editForm = reactive<TaskFormInput>({
-  title: '',
-  description: '',
-  dueDate: '',
-  priority: 'medium',
-  projectId: '',
-})
-
-const priorityOptions: Array<{ value: TaskPriority; label: string }> = [
-  { value: 'high', label: '高' },
-  { value: 'medium', label: '中' },
-  { value: 'low', label: '低' },
-]
-
-const projectOptions = computed(() =>
-  props.projects.map((project) => ({ value: project.id, label: project.name })),
-)
-
-function priorityLabel(priority: TaskPriority): string {
-  return priorityOptions.find((item) => item.value === priority)?.label ?? priority
+interface VirtualScrollerInstanceLike {
+  scrollToItem?: (index: number) => void
 }
 
-function beginEdit(task: Task) {
-  editingTaskId.value = task.id
-  editForm.title = task.title
-  editForm.description = task.description
-  editForm.dueDate = props.toLocalDateTimeInputValue(task.dueDate)
-  editForm.priority = task.priority
-  editForm.projectId = task.projectId
+const VIRTUAL_SCROLL_THRESHOLD = 50
+const shouldUseVirtualScroll = computed<boolean>(() => props.tasks.length > VIRTUAL_SCROLL_THRESHOLD)
+const virtualScrollerRef = ref<VirtualScrollerInstanceLike | null>(null)
+
+const {
+  editingTaskId,
+  dragTaskId,
+  dragOverTaskId,
+  subtaskDrafts,
+  subtaskPlanDrafts,
+  editingSubtaskTextKey,
+  editingSubtaskPlanKey,
+  editForm,
+  priorityOptions,
+  projectOptions,
+  beginEdit,
+  saveEdit,
+  cancelEdit,
+  handleTaskSpaceToggle,
+  handleTaskSelectedChange,
+  handleTaskCompletedChange,
+  confirmToggleTaskCompleted,
+  handleAddSubtask,
+  subtaskPlanKey,
+  getSubtaskPlanDraft,
+  getSubtaskTextDraft,
+  handleSubtaskTextDraftChange,
+  beginEditSubtaskText,
+  cancelEditSubtaskText,
+  handleUpdateSubtaskText,
+  handleSubtaskPlanDraftChange,
+  handleUpdateSubtaskPlannedAt,
+  beginEditSubtaskPlannedAt,
+  setSubtaskPlanEditorRef,
+  resetDragState,
+  handleDragStart,
+  handleDrop,
+  setTaskItemRef,
+  registerTaskVisibilityHandler,
+  handleTaskArrowNavigation,
+  handleTaskTabNavigation,
+  formatPlannedDate,
+  copySubtaskText,
+} = useTaskListModel(props as TaskListProps, emit)
+
+function ensureTaskVisible(index: number): void {
+  virtualScrollerRef.value?.scrollToItem?.(index)
 }
 
-function saveEdit(taskId: string) {
-  if (!editForm.title.trim()) {
-    return
-  }
-
-  emit('updateTask', {
-    taskId,
-    input: {
-      title: editForm.title,
-      description: editForm.description,
-      dueDate: editForm.dueDate,
-      priority: editForm.priority,
-      projectId: editForm.projectId,
-    },
-  })
-  editingTaskId.value = null
+function completedSubtaskCount(task: Task): number {
+  return task.subtasks.filter((subtask) => subtask.completed).length
 }
 
-function cancelEdit() {
-  editingTaskId.value = null
-}
-
-function handleTaskSpaceToggle(task: Task, event: KeyboardEvent) {
-  const target = event.target as HTMLElement | null
-  if (!target) {
-    return
-  }
-
-  if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)) {
-    return
-  }
-
-  confirmToggleTaskCompleted(task)
-}
-
-function handleTaskSelectedChange(taskId: string) {
-  emit('toggleTaskSelected', taskId)
-}
-
-function handleTaskCompletedChange(task: Task) {
-  confirmToggleTaskCompleted(task)
-}
-
-function confirmToggleTaskCompleted(task: Task) {
-  const nextCompleted = !task.completed
-  Modal.confirm({
-    title: nextCompleted ? '确认完成任务？' : '确认恢复任务？',
-    content: nextCompleted
-      ? '确认后将把该任务及其所有子任务标记为完成。'
-      : '确认后将把该任务及其所有子任务恢复为未完成。',
-    okText: '确认',
-    cancelText: '取消',
-    onOk: () => {
-      emit('toggleTaskCompleted', {
-        taskId: task.id,
-        completed: nextCompleted,
-      })
-    },
-  })
-}
-
-function handleAddSubtask(taskId: string) {
-  const text = (subtaskDrafts[taskId] ?? '').trim()
-  if (!text) {
-    return
-  }
-
-  emit('addSubtask', {
-    taskId,
-    text,
-    plannedAt: subtaskPlanDrafts[taskId] || '',
-  })
-  subtaskDrafts[taskId] = ''
-  subtaskPlanDrafts[taskId] = ''
-}
-
-function subtaskPlanKey(taskId: string, subtaskId: string): string {
-  return `${taskId}:${subtaskId}`
-}
-
-function getSubtaskPlanDraft(taskId: string, subtaskId: string, plannedAt: string | null): string {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  if (subtaskPlanDrafts[key] === undefined) {
-    subtaskPlanDrafts[key] = props.toLocalDateTimeInputValue(plannedAt)
-  }
-
-  return subtaskPlanDrafts[key] ?? ''
-}
-
-function setSubtaskPlanDraft(taskId: string, subtaskId: string, value: string) {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  subtaskPlanDrafts[key] = value
-}
-
-function getSubtaskTextDraft(taskId: string, subtaskId: string, text: string): string {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  if (subtaskTextDrafts[key] === undefined) {
-    subtaskTextDrafts[key] = text
-  }
-  return subtaskTextDrafts[key] ?? ''
-}
-
-function handleSubtaskTextDraftChange(taskId: string, subtaskId: string, value: string) {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  subtaskTextDrafts[key] = value
-}
-
-function beginEditSubtaskText(taskId: string, subtaskId: string, text: string) {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  subtaskTextDrafts[key] = text
-  editingSubtaskTextKey.value = key
-}
-
-function cancelEditSubtaskText() {
-  const key = editingSubtaskTextKey.value
-  if (!key) {
-    return
-  }
-
-  delete subtaskTextDrafts[key]
-  editingSubtaskTextKey.value = null
-}
-
-function handleUpdateSubtaskText(taskId: string, subtaskId: string) {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  const text = (subtaskTextDrafts[key] ?? '').trim()
-  if (!text) {
-    message.warning('子任务内容不能为空')
-    return
-  }
-
-  emit('updateSubtaskText', {
-    taskId,
-    subtaskId,
-    text,
-  })
-  delete subtaskTextDrafts[key]
-  editingSubtaskTextKey.value = null
-}
-
-function handleSubtaskPlanDraftChange(taskId: string, subtaskId: string, value: string) {
-  setSubtaskPlanDraft(taskId, subtaskId, value)
-}
-
-function handleUpdateSubtaskPlannedAt(taskId: string, subtaskId: string) {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  emit('updateSubtaskPlannedAt', {
-    taskId,
-    subtaskId,
-    plannedAt: subtaskPlanDrafts[key] || '',
-  })
-  editingSubtaskPlanKey.value = null
-  delete subtaskPlanDrafts[key]
-}
-
-function beginEditSubtaskPlannedAt(taskId: string, subtaskId: string, plannedAt: string | null) {
-  const key = subtaskPlanKey(taskId, subtaskId)
-  subtaskPlanDrafts[key] = props.toLocalDateTimeInputValue(plannedAt)
-  editingSubtaskPlanKey.value = key
-}
-
-function cancelEditSubtaskPlannedAt() {
-  const key = editingSubtaskPlanKey.value
-  if (!key) {
-    return
-  }
-
-  delete subtaskPlanDrafts[key]
-  editingSubtaskPlanKey.value = null
-}
-
-function setSubtaskPlanEditorRef(key: string, el: Element | ComponentPublicInstance | null) {
-  if (el && '$el' in el) {
-    subtaskPlanEditorRefs[key] = (el.$el as HTMLElement | null) ?? null
-    return
-  }
-
-  subtaskPlanEditorRefs[key] = (el as HTMLElement | null) ?? null
-}
-
-function handlePagePointerDown(event: MouseEvent) {
-  const key = editingSubtaskPlanKey.value
-  if (!key) {
-    return
-  }
-
-  const editor = subtaskPlanEditorRefs[key]
-  const target = event.target as Node | null
-  if (editor && target && editor.contains(target)) {
-    return
-  }
-
-  cancelEditSubtaskPlannedAt()
-}
-
-function resetDragState() {
-  dragTaskId.value = null
-  dragOverTaskId.value = null
-}
-
-function handleDragStart(taskId: string, event: DragEvent) {
-  const target = event.target as HTMLElement | null
-  if (
-    target?.closest(
-      'input,button,textarea,select,a,label,.ant-checkbox,.ant-checkbox-wrapper,.ant-input,.ant-input-affix-wrapper,.ant-input-group-wrapper,.subtask-plan-editor,.subtask-text-editor',
-    )
-  ) {
-    event.preventDefault()
-    return
-  }
-
-  dragTaskId.value = taskId
-}
-
-function handleDrop(targetTaskId: string) {
-  if (!dragTaskId.value || dragTaskId.value === targetTaskId) {
-    resetDragState()
-    return
-  }
-
-  emit('reorderTasks', { draggedTaskId: dragTaskId.value, targetTaskId })
-  resetDragState()
-}
-
-function setTaskItemRef(index: number, el: Element | ComponentPublicInstance | null) {
-  if (el && '$el' in el) {
-    taskItemRefs.value[index] = (el.$el as HTMLElement | null) ?? null
-    return
-  }
-
-  taskItemRefs.value[index] = (el as HTMLElement | null) ?? null
-}
-
-function isInteractiveTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return Boolean(
-    target.closest('input,textarea,select,button,a,label,.ant-checkbox-wrapper,.ant-input,.ant-select'),
-  )
-}
-
-function focusTaskByIndex(index: number) {
-  const el = taskItemRefs.value[index]
-  el?.focus()
-}
-
-function handleTaskArrowNavigation(index: number, step: number, event: KeyboardEvent) {
-  if (isInteractiveTarget(event.target)) {
-    return
-  }
-
-  const nextIndex = index + step
-  if (nextIndex < 0 || nextIndex >= props.tasks.length) {
-    return
-  }
-
-  event.preventDefault()
-  focusTaskByIndex(nextIndex)
-}
-
-function handleTaskTabNavigation(index: number, event: KeyboardEvent) {
-  if (isInteractiveTarget(event.target)) {
-    return
-  }
-
-  const step = event.shiftKey ? -1 : 1
-  const nextIndex = index + step
-  if (nextIndex < 0 || nextIndex >= props.tasks.length) {
-    return
-  }
-
-  event.preventDefault()
-  focusTaskByIndex(nextIndex)
-}
-
-function dueTagColor(task: Task): string {
-  const status = props.dueStatus(task)
-  if (status === 'overdue') return 'red'
-  if (status === 'today') return 'orange'
-  if (status === 'tomorrow') return 'blue'
-  if (status === 'week') return 'cyan'
-  return 'default'
-}
-
-function formatPlannedDate(iso: string | null): string {
-  if (!iso) {
-    return '无预计完成时间'
-  }
-
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) {
-    return '无预计完成时间'
-  }
-
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-function fallbackCopyText(text: string): boolean {
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.setAttribute('readonly', 'true')
-  textarea.style.position = 'fixed'
-  textarea.style.opacity = '0'
-  textarea.style.pointerEvents = 'none'
-  document.body.appendChild(textarea)
-  textarea.select()
-  const copied = document.execCommand('copy')
-  document.body.removeChild(textarea)
-  return copied
-}
-
-async function copySubtaskText(text: string) {
-  const content = text.trim()
-  if (!content) {
-    message.warning('子任务名称为空，无法复制')
-    return
-  }
-
-  try {
-    if (navigator.clipboard?.writeText && window.isSecureContext) {
-      await navigator.clipboard.writeText(content)
-      message.success('已复制子任务名称')
-      return
-    }
-
-    const copied = fallbackCopyText(content)
-    if (!copied) {
-      throw new Error('fallback copy failed')
-    }
-    message.success('已复制子任务名称')
-  }
-  catch {
-    message.error('复制失败，请手动复制')
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('mousedown', handlePagePointerDown)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handlePagePointerDown)
+watchEffect(() => {
+  registerTaskVisibilityHandler(shouldUseVirtualScroll.value ? ensureTaskVisible : null)
 })
 </script>
 
@@ -432,11 +119,27 @@ onBeforeUnmount(() => {
 
     <a-empty v-if="props.tasks.length === 0" description="当前没有匹配的任务" />
 
-    <div v-else class="task-list">
-      <article
-        v-for="(task, index) in props.tasks"
-        :key="task.id"
+    <DynamicScroller
+      v-else
+      ref="virtualScrollerRef"
+      class="task-list"
+      :class="{ 'task-list-virtual-enabled': shouldUseVirtualScroll }"
+      :items="props.tasks"
+      key-field="id"
+      :min-item-size="220"
+      :prerender="shouldUseVirtualScroll ? 6 : props.tasks.length"
+      :buffer="shouldUseVirtualScroll ? 300 : 0"
+    >
+      <template #default="{ item: task, index, active }">
+        <DynamicScrollerItem
+          :item="task"
+          :active="active"
+          :size-dependencies="[task.updatedAt, task.subtasks.length, editingTaskId === task.id, editingSubtaskTextKey, editingSubtaskPlanKey]"
+          class="task-scroller-item"
+        >
+          <article
         :id="`task-item-${task.id}`"
+        :data-task-index="index"
         :data-task-id="task.id"
         class="task-item"
         :class="{
@@ -450,7 +153,7 @@ onBeforeUnmount(() => {
         @keydown.up="handleTaskArrowNavigation(index, -1, $event)"
         @keydown.down="handleTaskArrowNavigation(index, 1, $event)"
         @keydown.tab="handleTaskTabNavigation(index, $event)"
-      >
+          >
         <a-card :bordered="false" class="task-card">
           <div
             class="task-drag-zone"
@@ -501,17 +204,13 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="meta-row">
-              <a-tag :color="task.priority === 'high' ? 'red' : task.priority === 'medium' ? 'gold' : 'green'">
-                优先级：{{ priorityLabel(task.priority) }}
-              </a-tag>
-              <a-tag color="purple">{{ props.projectNameById.get(task.projectId) || '未知清单' }}</a-tag>
-              <a-tag :color="dueTagColor(task)">
-                截止：{{ props.formatDueDate(task.dueDate) }}
-                <template v-if="props.dueHint(task)"> · {{ props.dueHint(task) }}</template>
-              </a-tag>
-              <a-tag :color="task.completed ? 'success' : 'processing'">
-                {{ task.completed ? '已完成' : '未完成' }}
-              </a-tag>
+              <TaskMetaTags
+                :task="task"
+                :project-name="props.projectNameById.get(task.projectId) || '未知清单'"
+                :due-date-text="props.formatDueDate(task.dueDate)"
+                :due-hint="props.dueHint(task)"
+                :due-status="props.dueStatus(task)"
+              />
             </div>
 
             <p v-if="task.description" class="desc">{{ task.description }}</p>
@@ -532,7 +231,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="subtasks-wrap">
-            <h4>子任务（{{ task.subtasks.filter((item) => item.completed).length }}/{{ task.subtasks.length }}）</h4>
+            <h4>子任务（{{ completedSubtaskCount(task) }}/{{ task.subtasks.length }}）</h4>
 
             <div v-if="task.subtasks.length > 0" class="subtask-list">
               <div
@@ -652,7 +351,9 @@ onBeforeUnmount(() => {
           </div>
         </a-card>
       </article>
-    </div>
+        </DynamicScrollerItem>
+      </template>
+    </DynamicScroller>
   </div>
 </template>
 
@@ -674,8 +375,21 @@ h2 {
 }
 
 .task-list {
-  display: grid;
-  gap: 10px;
+  display: block;
+}
+
+.task-list.task-list-virtual-enabled {
+  max-height: 72vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.task-scroller-item {
+  padding-bottom: 10px;
+}
+
+.task-scroller-item:last-child {
+  padding-bottom: 0;
 }
 
 .task-item {

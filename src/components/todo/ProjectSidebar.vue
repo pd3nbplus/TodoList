@@ -2,12 +2,17 @@
 import { ref } from 'vue'
 import type { Project } from '../../types/todo'
 
-const props = defineProps<{
-  projects: Project[]
-  selectedProjectId: string | 'all'
-  defaultProjectId: string
-  notificationPermission: NotificationPermission | 'unsupported'
-}>()
+const props = withDefaults(defineProps<{
+  projects?: Project[]
+  selectedProjectId?: string | 'all'
+  defaultProjectId?: string
+  notificationPermission?: NotificationPermission | 'unsupported'
+}>(), {
+  projects: () => [],
+  selectedProjectId: 'all',
+  defaultProjectId: 'inbox',
+  notificationPermission: 'unsupported',
+})
 
 const emit = defineEmits<{
   addProject: [name: string]
@@ -18,7 +23,7 @@ const emit = defineEmits<{
 
 const newProjectName = ref('')
 
-function submitProject() {
+function submitProject(): void {
   const name = newProjectName.value.trim()
   if (!name) {
     return
