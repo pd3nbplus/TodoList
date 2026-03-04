@@ -11,6 +11,7 @@ import cssnano from 'cssnano'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/todolist/',
   plugins: [
     vue(),
     vueJsx(),

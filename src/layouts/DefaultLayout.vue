@@ -103,6 +103,13 @@ watch(darkMode, (value) => {
           @click="onMenuClick"
         />
 
+        <div class="privacy-notice" :class="{ collapsed }">
+          <p class="privacy-title">数据说明</p>
+          <p class="privacy-text">
+            本项目仅使用浏览器本地存储（LocalStorage）保存任务，不会上传或收集个人信息。清除浏览器缓存或站点数据后，任务会自动丢失且无法恢复。
+          </p>
+        </div>
+
         <div class="theme-toggle" :class="{ collapsed }">
           <span v-if="!collapsed">深色模式</span>
           <a-switch v-model:checked="darkMode" />
@@ -156,6 +163,33 @@ watch(darkMode, (value) => {
   min-width: 0;
   height: 100vh;
   overflow: hidden;
+}
+
+.privacy-notice {
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f8eeff;
+}
+
+.privacy-notice.collapsed {
+  display: none;
+}
+
+.privacy-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.privacy-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.95;
 }
 
 .theme-toggle {
@@ -263,6 +297,11 @@ watch(darkMode, (value) => {
 
 .app-layout.dark-mode .theme-toggle {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.app-layout.dark-mode .privacy-notice {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 :deep(.app-layout.dark-mode .todo-page) {
